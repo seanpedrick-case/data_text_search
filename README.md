@@ -1,8 +1,8 @@
 ---
 title: Data text search
-emoji: 🚀
-colorFrom: green
-colorTo: indigo
+emoji: 🔍
+colorFrom: purple
+colorTo: green
 sdk: gradio
 sdk_version: 3.50.0
 app_file: app.py

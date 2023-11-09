@@ -1,6 +1,9 @@
 from search_funcs.fast_bm25 import BM25
 from search_funcs.clean_funcs import initial_clean, get_lemma_tokens#, stem_sentence
 from nltk import word_tokenize
+import nltk
+
+nltk.download('names')
 
 import gradio as gr
 import pandas as pd
