@@ -3,6 +3,7 @@ import nltk
 nltk.download('names')
 nltk.download('stopwords')
 nltk.download('wordnet')
+nltk.download('punkt')
 
 from search_funcs.fast_bm25 import BM25
 from search_funcs.clean_funcs import initial_clean, get_lemma_tokens#, stem_sentence
@@ -264,7 +265,7 @@ depends on factors such as the type of documents or queries. Information taken f
     gr.Markdown(
     """
     # Fast text search
-    Enter a text query below to search through a text data column and find relevant entries. Your data should contain at least 20 entries for the search to return results.
+    Enter a text query below to search through a text data column and find relevant terms. It will only find terms containing the exact text you enter. Your data should contain at least 20 entries for the search to consistently return results.
     """)
     
     with gr.Tab(label="Search your data"):
