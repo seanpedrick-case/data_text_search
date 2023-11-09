@@ -1,0 +1,21 @@
+1. Create minimal environment to run the app in conda. E.g. 'conda create --name new_env'
+
+2. Activate the environment 'conda activate new_env'
+
+3. cd to this folder. Install packages from requirements.txt using 'pip install -r requirements.txt' 
+
+4. In file explorer, navigate to the miniconda/envs/new_env/Lib/site-packages/gradio-client/ folder
+
+5. Copy types.json from the gradio_client folder to the folder containing the data_text_search.py file
+
+6. pip install pyinstaller
+
+7. In command line, cd to this folder. Then run the following 'python -m PyInstaller --additional-hooks-dir=. --hidden-import pyarrow.vendored.version --add-data="types.json;gradio_client" --clean --onefile --clean --name DataSearchApp data_text_search.py'
+
+8. A 'dist' folder will be created with the executable inside along with all dependencies('dist\data_text_search'). 
+
+9. In file explorer, navigate to the miniconda/envs/new_env/Lib/site-packages/gradio/ folder. Copy the entire folder. Paste this into the new distributable subfolder 'dist\data_text_search\_internal'
+
+10. In 'dist\data_text_search' try double clicking on the .exe file. After a short delay, the command prompt should inform you about the ip address of the app that is now running. Copy the ip address, but do not close this window.
+
+11. In an Internet browser, navigate to the indicated IP address. The app should now be running in your browser window.

@@ -1,0 +1,5 @@
+pandas
+nltk
+pyarrow
+openpyxl
+gradio==3.50.0

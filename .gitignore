@@ -1,0 +1,16 @@
+*.csv
+*.pyc
+*.cpython-311.pyc
+*.cpython-310.pyc
+*.bat
+*.json
+*.xlsx
+*.parquet
+*.json
+*.bat
+*.pkl
+*.spec
+*.ipynb
+build/*
+dist/*
+__pycache__/*
