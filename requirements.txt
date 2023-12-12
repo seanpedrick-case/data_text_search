@@ -2,4 +2,8 @@ pandas
 nltk
 pyarrow
 openpyxl
+transformers
+langchain
+chromadb
+torch
 gradio==3.50.0
