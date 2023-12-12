@@ -1,5 +1,5 @@
 import nltk
-
+from typing import TypeVar
 nltk.download('names')
 nltk.download('stopwords')
 nltk.download('wordnet')
@@ -9,10 +9,25 @@ from search_funcs.fast_bm25 import BM25
 from search_funcs.clean_funcs import initial_clean, get_lemma_tokens#, stem_sentence
 from nltk import word_tokenize
 
+PandasDataFrame = TypeVar('pd.core.frame.DataFrame')
 
 import gradio as gr
 import pandas as pd
 import os
+
+from itertools import compress
+
+#from langchain.embeddings import HuggingFaceEmbeddings
+#from langchain.vectorstores import FAISS
+from transformers import AutoModel
+
+import search_funcs.ingest as ing
+import search_funcs.chatfuncs as chatf
+
+# Import Chroma and instantiate a client. The default Chroma client is ephemeral, meaning it will not save to disk.
+import chromadb
+
+#collection = client.create_collection(name="my_collection")
 
 def prepare_input_data(in_file, text_column, clean="No", progress=gr.Progress()):
 
@@ -63,7 +78,7 @@ def get_file_path_end(file_path):
     
     return filename_without_extension
 
-def save_prepared_data(in_file, prepared_text_list, in_df, in_column):
+def save_prepared_data(in_file, prepared_text_list, in_df, in_bm25_column):
 
     # Check if the list and the dataframe have the same length
     if len(prepared_text_list) != len(in_df):
@@ -73,10 +88,10 @@ def save_prepared_data(in_file, prepared_text_list, in_df, in_column):
 
     file_name = get_file_path_end(in_file.name) + "_cleaned" + file_end
 
-    prepared_text_df = pd.DataFrame(data={in_column + "_cleaned":prepared_text_list})
+    prepared_text_df = pd.DataFrame(data={in_bm25_column + "_cleaned":prepared_text_list})
 
     # Drop original column from input file to reduce file size
-    in_df = in_df.drop(in_column, axis = 1)
+    in_df = in_df.drop(in_bm25_column, axis = 1)
 
     prepared_df = pd.concat([in_df, prepared_text_df], axis = 1)
 
@@ -194,7 +209,7 @@ def read_file(filename):
     elif file_type == 'parquet':
         return pd.read_parquet(filename).reset_index().drop(["index", "Unnamed: 0"], axis=1, errors="ignore")
 
-def put_columns_in_df(in_file, in_column):
+def put_columns_in_df(in_file, in_bm25_column):
     '''
     When file is loaded, update the column dropdown choices and change 'clean data' dropdown option to 'no'.
     '''
@@ -213,12 +228,12 @@ def put_columns_in_df(in_file, in_column):
     return gr.Dropdown(choices=concat_choices), gr.Dropdown(value="No", choices = ["Yes", "No"]),\
         gr.Dropdown(choices=concat_choices)
 
-def put_columns_in_join_df(in_file, in_column):
+def put_columns_in_join_df(in_file, in_bm25_column):
     '''
     When file is loaded, update the column dropdown choices and change 'clean data' dropdown option to 'no'.
     '''
 
-    print("in_column")
+    print("in_bm25_column")
 
     new_choices = []
     concat_choices = []
@@ -241,11 +256,293 @@ def dummy_function(gradio_component):
 
 def display_info(info_component):
     gr.Info(info_component)
-# %%
+
+embeddings_name = "jinaai/jina-embeddings-v2-small-en"
+
+#embeddings_name = "BAAI/bge-base-en-v1.5"
+import chromadb
+from typing_extensions import Protocol
+from chromadb import Documents, EmbeddingFunction, Embeddings
+
+embeddings_model = AutoModel.from_pretrained(embeddings_name, trust_remote_code=True)
+
+class MyEmbeddingFunction(EmbeddingFunction):
+    def __call__(self, input) -> Embeddings:
+     
+
+        embeddings = []
+        for text in input:
+            embeddings.append(embeddings_model.encode(text))
+
+        return embeddings
+
+
+def load_embeddings(embeddings_name = "jinaai/jina-embeddings-v2-small-en"):
+    '''
+    Load embeddings model and create a global variable based on it.
+    '''
+
+    # Import Chroma and instantiate a client. The default Chroma client is ephemeral, meaning it will not save to disk.
+    
+    #else: 
+    embeddings_func = AutoModel.from_pretrained(embeddings_name, trust_remote_code=True)
+
+    global embeddings
+
+    embeddings = embeddings_func
+
+    return embeddings
+
+embeddings = load_embeddings(embeddings_name)
+
+def docs_to_chroma_save(docs_out, embeddings=embeddings, progress=gr.Progress()):
+    '''
+    Takes a Langchain document class and saves it into a Chroma sqlite file.
+    '''
+
+
+
+    print(f"> Total split documents: {len(docs_out)}")
+
+    #print(docs_out)
+
+    page_contents = [doc.page_content for doc in docs_out]
+    page_meta = [doc.metadata for doc in docs_out]
+    ids_range = range(0,len(page_contents)) 
+    ids = [str(element) for element in ids_range]
+
+    embeddings_list = []
+    for page in progress.tqdm(page_contents, desc = "Preparing search index", unit = "rows"):
+        embeddings_list.append(embeddings.encode(sentences=page, max_length=1024).tolist())
+
+
+    client = chromadb.PersistentClient(path=".")
+
+    # Create a new Chroma collection to store the supporting evidence. We don't need to specify an embedding fuction, and the default will be used.
+    try:
+        collection = client.get_collection(name="my_collection")
+        client.delete_collection(name="my_collection")
+    except: 
+        collection = client.create_collection(name="my_collection")
+                                          
+    collection.add(
+    documents = page_contents,
+    embeddings = embeddings_list,
+    metadatas = page_meta,
+    ids = ids)
+
+    #chatf.vectorstore = vectorstore_func
+
+    out_message = "Document processing complete"
+
+    return out_message, collection
+
+def jina_simple_retrieval(new_question_kworded, vectorstore, docs, k_val, out_passages,
+                           vec_score_cut_off, vec_weight): # ,vectorstore, embeddings
+
+            from numpy.linalg import norm
+
+            cos_sim = lambda a,b: (a @ b.T) / (norm(a)*norm(b))
+
+            query = embeddings.encode(new_question_kworded)
+
+            # Calculate cosine similarity with each string in the list
+            cosine_similarities = [cos_sim(query, string_vector) for string_vector in vectorstore]
+
+
+
+            print(cosine_similarities)
+
+
+
+            #vectorstore=globals()["vectorstore"]
+            #embeddings=globals()["embeddings"]
+            doc_df = pd.DataFrame()
+
+
+            docs = vectorstore.similarity_search_with_score(new_question_kworded, k=k_val)
+
+            print("Docs from similarity search:")
+            print(docs)
+
+            # Keep only documents with a certain score
+            docs_len = [len(x[0].page_content) for x in docs]
+            docs_scores = [x[1] for x in docs]
+
+            # Only keep sources that are sufficiently relevant (i.e. similarity search score below threshold below)
+            score_more_limit = pd.Series(docs_scores) < vec_score_cut_off
+            docs_keep = list(compress(docs, score_more_limit))
+
+            if not docs_keep:
+                return [], pd.DataFrame(), []
+
+            # Only keep sources that are at least 100 characters long
+            length_more_limit = pd.Series(docs_len) >= 100
+            docs_keep = list(compress(docs_keep, length_more_limit))
+
+            if not docs_keep:
+                return [], pd.DataFrame(), []
+
+            docs_keep_as_doc = [x[0] for x in docs_keep]
+            docs_keep_length = len(docs_keep_as_doc)
+
+
+                
+            if docs_keep_length == 1:
+
+                content=[]
+                meta_url=[]
+                score=[]
+                
+                for item in docs_keep:
+                    content.append(item[0].page_content)
+                    meta_url.append(item[0].metadata['source'])
+                    score.append(item[1])       
+
+                # Create df from 'winning' passages
+
+                doc_df = pd.DataFrame(list(zip(content, meta_url, score)),
+                columns =['page_content', 'meta_url', 'score'])
+
+                docs_content = doc_df['page_content'].astype(str)
+                docs_url = doc_df['meta_url']
+
+                return docs_keep_as_doc, docs_content, docs_url
+            
+            # Check for if more docs are removed than the desired output
+            if out_passages > docs_keep_length: 
+                out_passages = docs_keep_length
+                k_val = docs_keep_length
+                     
+            vec_rank = [*range(1, docs_keep_length+1)]
+            vec_score = [(docs_keep_length/x)*vec_weight for x in vec_rank]
+
+            ## Calculate final score based on three ranking methods
+            final_score = [a for a in zip(vec_score)]
+            final_rank = [sorted(final_score, reverse=True).index(x)+1 for x in final_score]
+            # Force final_rank to increment by 1 each time
+            final_rank = list(pd.Series(final_rank).rank(method='first'))
+
+            #print("final rank: " + str(final_rank))
+            #print("out_passages: " + str(out_passages))
+
+            best_rank_index_pos = []
+
+            for x in range(1,out_passages+1):
+                try:
+                    best_rank_index_pos.append(final_rank.index(x))
+                except IndexError: # catch the error
+                    pass
+
+            # Adjust best_rank_index_pos to 
+
+            best_rank_pos_series = pd.Series(best_rank_index_pos)
+
+
+            docs_keep_out = [docs_keep[i] for i in best_rank_index_pos]
+        
+            # Keep only 'best' options
+            docs_keep_as_doc = [x[0] for x in docs_keep_out]
+                               
+            # Make df of best options
+            doc_df = create_doc_df(docs_keep_out)
+
+            return docs_keep_as_doc, doc_df, docs_keep_out
+
+def chroma_retrieval(new_question_kworded, vectorstore, docs, k_val, out_passages,
+                           vec_score_cut_off, vec_weight): # ,vectorstore, embeddings
+
+            query = embeddings.encode(new_question_kworded).tolist()
+
+            docs = vectorstore.query(
+            query_embeddings=query,
+            n_results= 9999 # No practical limit on number of responses returned
+            #where={"metadata_field": "is_equal_to_this"},
+            #where_document={"$contains":"search_string"}
+            )
+
+            # Calculate cosine similarity with each string in the list
+            #cosine_similarities = [cos_sim(query, string_vector) for string_vector in vectorstore]
+
+            #print(docs)
+
+            #vectorstore=globals()["vectorstore"]
+            #embeddings=globals()["embeddings"]
+            df = pd.DataFrame(data={'ids': docs['ids'][0],
+                                    'documents': docs['documents'][0],
+                                    'metadatas':docs['metadatas'][0],
+                                    'distances':docs['distances'][0]#,                                    
+                                    #'embeddings': docs['embeddings']
+                                    })
+            
+            def create_docs_keep_from_df(df):
+                dict_out = {'ids' : [df['ids']],
+                            'documents': [df['documents']],
+                            'metadatas': [df['metadatas']],
+                            'distances': [df['distances']],
+                            'embeddings': None
+                            }
+                return dict_out
+                
+            # Prepare the DataFrame by transposing
+            df_docs = df#.apply(lambda x: x.explode()).reset_index(drop=True)
+
+            #print(df_docs)
+
+
+            # Keep only documents with a certain score
+            
+            docs_scores = df_docs["distances"] #.astype(float)
+
+            #print(docs_scores)
+
+            # Only keep sources that are sufficiently relevant (i.e. similarity search score below threshold below)
+            score_more_limit = df_docs.loc[docs_scores < vec_score_cut_off, :]
+            docs_keep = create_docs_keep_from_df(score_more_limit) #list(compress(docs, score_more_limit))
+
+            #print(docs_keep)
+
+            if not docs_keep:
+                return 'No result found!', ""
+
+            # Only keep sources that are at least 100 characters long
+            docs_len = score_more_limit["documents"].str.len() >= 100
+            length_more_limit = score_more_limit.loc[docs_len, :] #pd.Series(docs_len) >= 100
+            docs_keep = create_docs_keep_from_df(length_more_limit) #list(compress(docs_keep, length_more_limit))
+
+            #print(docs_keep)
+
+            print(length_more_limit)
+
+            if not docs_keep:
+                return 'No result found!', ""
+            
+            results_df_name = "semantic_search_result.csv"
+            length_more_limit.to_csv(results_df_name, index= None)
+            results_first_text = length_more_limit["documents"][0]
+
+            
+            return results_first_text, results_df_name
+
 # ## Gradio app - BM25 search
 block = gr.Blocks(theme = gr.themes.Base())
 
-with block:  
+with block:
+
+    ingest_text = gr.State()
+    ingest_metadata = gr.State()
+    ingest_docs = gr.State()
+    vectorstore_state = gr.State() # globals()["vectorstore"]
+    embeddings_state = gr.State() # globals()["embeddings"]
+
+    k_val = gr.State(100)
+    out_passages = gr.State(100)
+    vec_score_cut_off = gr.State(100)
+    vec_weight = gr.State(1)
+
+    docs_keep_as_doc_state = gr.State()
+    doc_df_state = gr.State()
+    docs_keep_out_state = gr.State()
 
     corpus_state = gr.State()
     data_state = gr.State(pd.DataFrame())
@@ -267,14 +564,18 @@ depends on factors such as the type of documents or queries. Information taken f
     # Fast text search
     Enter a text query below to search through a text data column and find relevant terms. It will only find terms containing the exact text you enter. Your data should contain at least 20 entries for the search to consistently return results.
     """)
+
     
     with gr.Tab(label="Search your data"):
+        with gr.Row():
+            current_source = gr.Textbox(label="Current data source(s)", value="None")
+
         with gr.Accordion(label = "Load in data", open=True):
-            in_corpus = gr.File(label="Upload your search data here")
+            in_bm25_file = gr.File(label="Upload your search data here")
             with gr.Row():
-                in_column = gr.Dropdown(label="Enter the name of the text column in the data file to search")
+                in_bm25_column = gr.Dropdown(label="Enter the name of the text column in the data file to search")
                 
-                load_data_button = gr.Button(value="Load data")
+                load_bm25_data_button = gr.Button(value="Load data")
                  
 
             with gr.Row():
@@ -291,6 +592,21 @@ depends on factors such as the type of documents or queries. Information taken f
             with gr.Row():
                 output_single_text = gr.Textbox(label="Top result")
                 output_file = gr.File(label="File output")
+
+    
+    with gr.Tab("Fuzzy/semantic search"):
+        with gr.Accordion("CSV/Excel file", open = True):
+            in_semantic_file = gr.File(label="Upload data file for semantic search")
+            in_semantic_column = gr.Dropdown(label="Enter the name of the text column in the data file to search")
+            load_semantic_data_button = gr.Button(value="Load in CSV/Excel file", variant="secondary", scale=0)
+        
+        ingest_embed_out = gr.Textbox(label="File/web page preparation progress")
+        semantic_query = gr.Textbox(label="Enter semantic search query here")
+        semantic_submit = gr.Button(value="Start semantic search", variant="secondary", scale = 1)
+
+        with gr.Row():
+            semantic_output_single_text = gr.Textbox(label="Top result")
+            semantic_output_file = gr.File(label="File output")
             
 
     with gr.Tab(label="Advanced options"):
@@ -327,28 +643,33 @@ depends on factors such as the type of documents or queries. Information taken f
     in_no_search_results_button.click(display_info, inputs=in_no_search_info)
     
 
-    in_corpus.upload(put_columns_in_df, inputs=[in_corpus, in_column], outputs=[in_column, in_clean_data, search_df_join_column])
+    # Update dropdowns upon initial file load
+    in_bm25_file.upload(put_columns_in_df, inputs=[in_bm25_file, in_bm25_column], outputs=[in_bm25_column, in_clean_data, search_df_join_column])
     in_join_file.upload(put_columns_in_join_df, inputs=[in_join_file, in_join_column], outputs=[in_join_column])
-
-    # Load in the data
-    load_data_button.click(fn=prepare_input_data, inputs=[in_corpus, in_column, in_clean_data], outputs=[corpus_state, load_finished_message, data_state, output_file]).\
+ 
+    # Load in BM25 data
+    load_bm25_data_button.click(fn=prepare_input_data, inputs=[in_bm25_file, in_bm25_column, in_clean_data], outputs=[corpus_state, load_finished_message, data_state, output_file]).\
     then(fn=prepare_bm25, inputs=[corpus_state, in_k1, in_b, in_alpha], outputs=[load_finished_message]).\
-    then(fn=put_columns_in_df, inputs=[in_corpus, in_column], outputs=[in_column, in_clean_data, search_df_join_column])
-
-    #save_clean_data_button.click(fn=save_prepared_data, inputs=[in_corpus, corpus_state, data_state, in_column], outputs=[output_file])   
+    then(fn=put_columns_in_df, inputs=[in_bm25_file, in_bm25_column], outputs=[in_bm25_column, in_clean_data, search_df_join_column])
+   
+    # BM25 search functions on click or enter
+    search_button.click(fn=bm25_search, inputs=[in_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file, mod_query], api_name="search")
+    in_query.submit(fn=bm25_search, inputs=[in_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file, mod_query])
     
-
-    # Search functions on click or enter
-    search_button.click(fn=bm25_search, inputs=[in_query, in_no_search_results, data_state, in_column, in_clean_data, in_join_file, in_join_column, search_df_join_column],
-                        outputs=[output_single_text, output_file, mod_query], api_name="search")
+    # Load in a csv/excel file for semantic search
+    in_semantic_file.upload(put_columns_in_df, inputs=[in_semantic_file, in_semantic_column], outputs=[in_semantic_column, in_clean_data, search_df_join_column])
+    load_semantic_data_button.click(ing.parse_csv_or_excel, inputs=[in_semantic_file, in_semantic_column], outputs=[ingest_text, current_source]).\
+             then(ing.csv_excel_text_to_docs, inputs=[ingest_text, in_semantic_column], outputs=[ingest_docs]).\
+             then(docs_to_chroma_save, inputs=[ingest_docs], outputs=[ingest_embed_out, vectorstore_state])
     
-    in_query.submit(fn=bm25_search, inputs=[in_query, in_no_search_results, data_state, in_column, in_clean_data, in_join_file, in_join_column, search_df_join_column],
-                        outputs=[output_single_text, output_file, mod_query])
+    # Semantic search query
+    semantic_submit.click(chroma_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, k_val,out_passages, vec_score_cut_off, vec_weight], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic")
     
     # Dummy functions just to get dropdowns to work correctly with Gradio 3.50
-    in_column.change(dummy_function, in_column, None)
+    in_bm25_column.change(dummy_function, in_bm25_column, None)
     search_df_join_column.change(dummy_function, search_df_join_column, None)
     in_join_column.change(dummy_function, in_join_column, None)
+    in_semantic_column.change(dummy_function, in_join_column, None)
 
 block.queue().launch(debug=True)
 
