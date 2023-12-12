@@ -26,8 +26,14 @@ import search_funcs.chatfuncs as chatf
 
 # Import Chroma and instantiate a client. The default Chroma client is ephemeral, meaning it will not save to disk.
 import chromadb
+#from typing_extensions import Protocol
+#from chromadb import Documents, EmbeddingFunction, Embeddings
 
-#collection = client.create_collection(name="my_collection")
+# Remove Chroma database file. If it exists as it can cause issues
+chromadb_file = "chroma.sqlite3"
+
+if os.path.isfile(chromadb_file):
+    os.remove(chromadb_file)
 
 def prepare_input_data(in_file, text_column, clean="No", progress=gr.Progress()):
 
@@ -257,25 +263,13 @@ def dummy_function(gradio_component):
 def display_info(info_component):
     gr.Info(info_component)
 
-embeddings_name = "jinaai/jina-embeddings-v2-small-en"
+# class MyEmbeddingFunction(EmbeddingFunction):
+#     def __call__(self, input) -> Embeddings:
+#         embeddings = []
+#         for text in input:
+#             embeddings.append(embeddings_model.encode(text))
 
-#embeddings_name = "BAAI/bge-base-en-v1.5"
-import chromadb
-from typing_extensions import Protocol
-from chromadb import Documents, EmbeddingFunction, Embeddings
-
-embeddings_model = AutoModel.from_pretrained(embeddings_name, trust_remote_code=True)
-
-class MyEmbeddingFunction(EmbeddingFunction):
-    def __call__(self, input) -> Embeddings:
-     
-
-        embeddings = []
-        for text in input:
-            embeddings.append(embeddings_model.encode(text))
-
-        return embeddings
-
+#         return embeddings
 
 def load_embeddings(embeddings_name = "jinaai/jina-embeddings-v2-small-en"):
     '''
@@ -293,14 +287,16 @@ def load_embeddings(embeddings_name = "jinaai/jina-embeddings-v2-small-en"):
 
     return embeddings
 
+# Load embeddings
+embeddings_name = "jinaai/jina-embeddings-v2-small-en"
+#embeddings_name = "BAAI/bge-base-en-v1.5"
+embeddings_model = AutoModel.from_pretrained(embeddings_name, trust_remote_code=True)
 embeddings = load_embeddings(embeddings_name)
 
-def docs_to_chroma_save(docs_out, embeddings=embeddings, progress=gr.Progress()):
+def docs_to_chroma_save(docs_out, embeddings = embeddings, progress=gr.Progress()):
     '''
     Takes a Langchain document class and saves it into a Chroma sqlite file.
     '''
-
-
 
     print(f"> Total split documents: {len(docs_out)}")
 
@@ -349,126 +345,23 @@ def jina_simple_retrieval(new_question_kworded, vectorstore, docs, k_val, out_pa
             # Calculate cosine similarity with each string in the list
             cosine_similarities = [cos_sim(query, string_vector) for string_vector in vectorstore]
 
-
-
             print(cosine_similarities)
 
+            return cosine_similarities
 
-
-            #vectorstore=globals()["vectorstore"]
-            #embeddings=globals()["embeddings"]
-            doc_df = pd.DataFrame()
-
-
-            docs = vectorstore.similarity_search_with_score(new_question_kworded, k=k_val)
-
-            print("Docs from similarity search:")
-            print(docs)
-
-            # Keep only documents with a certain score
-            docs_len = [len(x[0].page_content) for x in docs]
-            docs_scores = [x[1] for x in docs]
-
-            # Only keep sources that are sufficiently relevant (i.e. similarity search score below threshold below)
-            score_more_limit = pd.Series(docs_scores) < vec_score_cut_off
-            docs_keep = list(compress(docs, score_more_limit))
-
-            if not docs_keep:
-                return [], pd.DataFrame(), []
-
-            # Only keep sources that are at least 100 characters long
-            length_more_limit = pd.Series(docs_len) >= 100
-            docs_keep = list(compress(docs_keep, length_more_limit))
-
-            if not docs_keep:
-                return [], pd.DataFrame(), []
-
-            docs_keep_as_doc = [x[0] for x in docs_keep]
-            docs_keep_length = len(docs_keep_as_doc)
-
-
-                
-            if docs_keep_length == 1:
-
-                content=[]
-                meta_url=[]
-                score=[]
-                
-                for item in docs_keep:
-                    content.append(item[0].page_content)
-                    meta_url.append(item[0].metadata['source'])
-                    score.append(item[1])       
-
-                # Create df from 'winning' passages
-
-                doc_df = pd.DataFrame(list(zip(content, meta_url, score)),
-                columns =['page_content', 'meta_url', 'score'])
-
-                docs_content = doc_df['page_content'].astype(str)
-                docs_url = doc_df['meta_url']
-
-                return docs_keep_as_doc, docs_content, docs_url
-            
-            # Check for if more docs are removed than the desired output
-            if out_passages > docs_keep_length: 
-                out_passages = docs_keep_length
-                k_val = docs_keep_length
-                     
-            vec_rank = [*range(1, docs_keep_length+1)]
-            vec_score = [(docs_keep_length/x)*vec_weight for x in vec_rank]
-
-            ## Calculate final score based on three ranking methods
-            final_score = [a for a in zip(vec_score)]
-            final_rank = [sorted(final_score, reverse=True).index(x)+1 for x in final_score]
-            # Force final_rank to increment by 1 each time
-            final_rank = list(pd.Series(final_rank).rank(method='first'))
-
-            #print("final rank: " + str(final_rank))
-            #print("out_passages: " + str(out_passages))
-
-            best_rank_index_pos = []
-
-            for x in range(1,out_passages+1):
-                try:
-                    best_rank_index_pos.append(final_rank.index(x))
-                except IndexError: # catch the error
-                    pass
-
-            # Adjust best_rank_index_pos to 
-
-            best_rank_pos_series = pd.Series(best_rank_index_pos)
-
-
-            docs_keep_out = [docs_keep[i] for i in best_rank_index_pos]
-        
-            # Keep only 'best' options
-            docs_keep_as_doc = [x[0] for x in docs_keep_out]
-                               
-            # Make df of best options
-            doc_df = create_doc_df(docs_keep_out)
-
-            return docs_keep_as_doc, doc_df, docs_keep_out
-
-def chroma_retrieval(new_question_kworded, vectorstore, docs, k_val, out_passages,
-                           vec_score_cut_off, vec_weight): # ,vectorstore, embeddings
+def chroma_retrieval(new_question_kworded:str, vectorstore, docs, orig_df_col:str, k_val:int, out_passages:int,
+                           vec_score_cut_off:float, vec_weight:float, in_join_file = None, in_join_column = None, search_df_join_column = None): # ,vectorstore, embeddings
 
             query = embeddings.encode(new_question_kworded).tolist()
 
             docs = vectorstore.query(
             query_embeddings=query,
-            n_results= 9999 # No practical limit on number of responses returned
+            n_results= k_val # No practical limit on number of responses returned
             #where={"metadata_field": "is_equal_to_this"},
             #where_document={"$contains":"search_string"}
             )
 
-            # Calculate cosine similarity with each string in the list
-            #cosine_similarities = [cos_sim(query, string_vector) for string_vector in vectorstore]
-
-            #print(docs)
-
-            #vectorstore=globals()["vectorstore"]
-            #embeddings=globals()["embeddings"]
-            df = pd.DataFrame(data={'ids': docs['ids'][0],
+            df_docs = pd.DataFrame(data={'ids': docs['ids'][0],
                                     'documents': docs['documents'][0],
                                     'metadatas':docs['metadatas'][0],
                                     'distances':docs['distances'][0]#,                                    
@@ -479,22 +372,17 @@ def chroma_retrieval(new_question_kworded, vectorstore, docs, k_val, out_passage
                 dict_out = {'ids' : [df['ids']],
                             'documents': [df['documents']],
                             'metadatas': [df['metadatas']],
-                            'distances': [df['distances']],
+                            'distances': [round(df['distances'].astype(float), 2)],
                             'embeddings': None
                             }
                 return dict_out
                 
             # Prepare the DataFrame by transposing
-            df_docs = df#.apply(lambda x: x.explode()).reset_index(drop=True)
-
-            #print(df_docs)
-
+            #df_docs = df#.apply(lambda x: x.explode()).reset_index(drop=True)
 
             # Keep only documents with a certain score
             
             docs_scores = df_docs["distances"] #.astype(float)
-
-            #print(docs_scores)
 
             # Only keep sources that are sufficiently relevant (i.e. similarity search score below threshold below)
             score_more_limit = df_docs.loc[docs_scores < vec_score_cut_off, :]
@@ -510,21 +398,48 @@ def chroma_retrieval(new_question_kworded, vectorstore, docs, k_val, out_passage
             length_more_limit = score_more_limit.loc[docs_len, :] #pd.Series(docs_len) >= 100
             docs_keep = create_docs_keep_from_df(length_more_limit) #list(compress(docs_keep, length_more_limit))
 
-            #print(docs_keep)
-
-            print(length_more_limit)
+            #print(length_more_limit)
 
             if not docs_keep:
                 return 'No result found!', ""
             
-            results_df_name = "semantic_search_result.csv"
-            length_more_limit.to_csv(results_df_name, index= None)
-            results_first_text = length_more_limit["documents"][0]
+            length_more_limit['ids'] = length_more_limit['ids'].astype(int)
 
-            
+            #length_more_limit.to_csv("length_more_limit.csv", index = None)
+
+            # Explode the 'metadatas' dictionary into separate columns
+            df_metadata_expanded = df_docs['metadatas'].apply(pd.Series)
+
+            # Concatenate the original DataFrame with the expanded metadata DataFrame
+            results_df_out = pd.concat([df_docs.drop('metadatas', axis=1), df_metadata_expanded], axis=1)
+
+            results_df_out = results_df_out.rename(columns={"documents":orig_df_col})
+
+            results_df_out = results_df_out.drop(["page_section", "row", "source", "id"], axis=1, errors="ignore")
+            results_df_out['distances'] = round(results_df_out['distances'].astype(float), 2)
+
+            # Join back to original df
+            # results_df_out = orig_df.merge(length_more_limit[['ids', 'distances']], left_index = True, right_on = "ids", how="inner").sort_values("distances")
+
+            # Join on additional files
+            if in_join_file:
+                join_filename = in_join_file.name
+
+                # Import data
+                join_df = read_file(join_filename)
+                join_df[in_join_column] = join_df[in_join_column].astype(str).str.replace("\.0$","", regex=True)
+                results_df_out[search_df_join_column] = results_df_out[search_df_join_column].astype(str).str.replace("\.0$","", regex=True)
+
+                results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left").drop(in_join_column, axis=1)
+
+
+            results_df_name = "semantic_search_result.csv"
+            results_df_out.to_csv(results_df_name, index= None)
+            results_first_text = results_df_out[orig_df_col][0]
+
             return results_first_text, results_df_name
 
-# ## Gradio app - BM25 search
+## Gradio app - BM25 search
 block = gr.Blocks(theme = gr.themes.Base())
 
 with block:
@@ -535,8 +450,8 @@ with block:
     vectorstore_state = gr.State() # globals()["vectorstore"]
     embeddings_state = gr.State() # globals()["embeddings"]
 
-    k_val = gr.State(100)
-    out_passages = gr.State(100)
+    k_val = gr.State(9999)
+    out_passages = gr.State(9999)
     vec_score_cut_off = gr.State(100)
     vec_weight = gr.State(1)
 
@@ -564,9 +479,8 @@ depends on factors such as the type of documents or queries. Information taken f
     # Fast text search
     Enter a text query below to search through a text data column and find relevant terms. It will only find terms containing the exact text you enter. Your data should contain at least 20 entries for the search to consistently return results.
     """)
-
     
-    with gr.Tab(label="Search your data"):
+    with gr.Tab(label="Keyword search"):
         with gr.Row():
             current_source = gr.Textbox(label="Current data source(s)", value="None")
 
@@ -577,10 +491,8 @@ depends on factors such as the type of documents or queries. Information taken f
                 
                 load_bm25_data_button = gr.Button(value="Load data")
                  
-
             with gr.Row():
                 load_finished_message = gr.Textbox(label="Load progress", scale = 2)
-
 
         with gr.Accordion(label = "Search data", open=True):
             with gr.Row():
@@ -593,9 +505,11 @@ depends on factors such as the type of documents or queries. Information taken f
                 output_single_text = gr.Textbox(label="Top result")
                 output_file = gr.File(label="File output")
 
-    
     with gr.Tab("Fuzzy/semantic search"):
-        with gr.Accordion("CSV/Excel file", open = True):
+        with gr.Row():
+            current_source_semantic = gr.Textbox(label="Current data source(s)", value="None")
+
+        with gr.Accordion("Load in data", open = True):
             in_semantic_file = gr.File(label="Upload data file for semantic search")
             in_semantic_column = gr.Dropdown(label="Enter the name of the text column in the data file to search")
             load_semantic_data_button = gr.Button(value="Load in CSV/Excel file", variant="secondary", scale=0)
@@ -608,7 +522,6 @@ depends on factors such as the type of documents or queries. Information taken f
             semantic_output_single_text = gr.Textbox(label="Top result")
             semantic_output_file = gr.File(label="File output")
             
-
     with gr.Tab(label="Advanced options"):
         with gr.Accordion(label="Data load / save options", open = False):
             #with gr.Row():
@@ -658,12 +571,12 @@ depends on factors such as the type of documents or queries. Information taken f
     
     # Load in a csv/excel file for semantic search
     in_semantic_file.upload(put_columns_in_df, inputs=[in_semantic_file, in_semantic_column], outputs=[in_semantic_column, in_clean_data, search_df_join_column])
-    load_semantic_data_button.click(ing.parse_csv_or_excel, inputs=[in_semantic_file, in_semantic_column], outputs=[ingest_text, current_source]).\
+    load_semantic_data_button.click(ing.parse_csv_or_excel, inputs=[in_semantic_file, in_semantic_column], outputs=[ingest_text, current_source_semantic]).\
              then(ing.csv_excel_text_to_docs, inputs=[ingest_text, in_semantic_column], outputs=[ingest_docs]).\
              then(docs_to_chroma_save, inputs=[ingest_docs], outputs=[ingest_embed_out, vectorstore_state])
     
     # Semantic search query
-    semantic_submit.click(chroma_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, k_val,out_passages, vec_score_cut_off, vec_weight], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic")
+    semantic_submit.click(chroma_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, vec_score_cut_off, vec_weight, in_join_file, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic")
     
     # Dummy functions just to get dropdowns to work correctly with Gradio 3.50
     in_bm25_column.change(dummy_function, in_bm25_column, None)

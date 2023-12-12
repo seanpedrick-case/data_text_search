@@ -249,9 +249,7 @@ def csv_excel_text_to_docs(df, text_column='text', chunk_size=None) -> List[Docu
             if col != text_column:
                 metadata[col] = value
 
-        metadata_string = write_out_metadata_as_string(metadata)[0]
-
-        
+        metadata_string = write_out_metadata_as_string(metadata)[0]      
 
         # If chunk_size is provided, split the text into chunks
         if chunk_size:
