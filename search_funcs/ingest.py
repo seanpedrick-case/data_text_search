@@ -1,39 +1,40 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: ipynb,py:light
-#     text_representation:
-#       extension: .py
-#       format_name: light
-#       format_version: '1.5'
-#       jupytext_version: 1.14.6
-#   kernelspec:
-#     display_name: Python 3 (ipykernel)
-#     language: python
-#     name: python3
-# ---
-
-# # Ingest website to FAISS
-
-# ## Install/ import stuff we need
+# Install/ import stuff we need
 
 import os
-from pathlib import Path
+import time
 import re
 import pandas as pd
-from typing import TypeVar, List
+import gradio as gr
+from typing import Type, List, Literal
 
-#from langchain.embeddings import HuggingFaceEmbeddings # HuggingFaceInstructEmbeddings, 
-from langchain.vectorstores.faiss import FAISS
-from langchain.vectorstores import Chroma
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.docstore.document import Document
+from pydantic import BaseModel, Field
 
-#from bs4 import BeautifulSoup
-#from docx import Document as Doc
-#from pypdf import PdfReader
+# Creating an alias for pandas DataFrame using Type
+PandasDataFrame = Type[pd.DataFrame]
 
-PandasDataFrame = TypeVar('pd.core.frame.DataFrame')
+# class Document(BaseModel):
+#     """Class for storing a piece of text and associated metadata. Implementation adapted from Langchain code: https://github.com/langchain-ai/langchain/blob/master/libs/core/langchain_core/documents/base.py"""
+
+#     page_content: str
+#     """String text."""
+#     metadata: dict = Field(default_factory=dict)
+#     """Arbitrary metadata about the page content (e.g., source, relationships to other
+#         documents, etc.).
+#     """
+#     type: Literal["Document"] = "Document"
+
+class Document(BaseModel):
+    """Class for storing a piece of text and associated metadata. Implementation adapted from Langchain code: https://github.com/langchain-ai/langchain/blob/master/libs/core/langchain_core/documents/base.py"""
+
+    page_content: str
+    """String text."""
+    metadata: dict = Field(default_factory=dict)
+    """Arbitrary metadata about the page content (e.g., source, relationships to other
+        documents, etc.).
+    """
+    type: Literal["Document"] = "Document"
+
+
 # -
 
 split_strat = ["\n\n", "\n", ". ", "! ", "? "]
@@ -79,7 +80,8 @@ def parse_file(file_paths, text_column='text'):
         # '.html': parse_html,
         # '.htm': parse_html,  # Considering both .html and .htm for HTML files
         '.csv': lambda file_path: parse_csv_or_excel(file_path, text_column),
-        '.xlsx': lambda file_path: parse_csv_or_excel(file_path, text_column)
+        '.xlsx': lambda file_path: parse_csv_or_excel(file_path, text_column),
+        '.parquet': lambda file_path: parse_csv_or_excel(file_path, text_column)
     }
     
     parsed_contents = {}
@@ -145,34 +147,15 @@ def parse_csv_or_excel(file_path, text_column = "text"):
                 if text_column not in df.columns: return pd.DataFrame(), ['Please choose a valid column name']
                 df['source'] = file_name
                 df['page_section'] = ""
+        elif file_extension == ".parquet":
+                df = pd.read_parquet(file_path.name)
+                if text_column not in df.columns: return pd.DataFrame(), ['Please choose a valid column name']
+                df['source'] = file_name
+                df['page_section'] = ""
         else:
                 print(f"Unsupported file type: {file_extension}")
                 return pd.DataFrame(), ['Please choose a valid file type']
-            
-        #    file_names.append(file_name)
-        #    out_df = pd.concat([out_df, df])
-        
-        #if text_column not in df.columns:
-        #    return f"Column '{text_column}' not found in {file_path}"
-        #text_out = " ".join(df[text_column].dropna().astype(str))
         return df, file_names
-
-def parse_excel(file_path, text_column):
-        """
-        Read text from an Excel file.
-        
-        Parameters:
-            file_path (str): Path to the Excel file.
-            text_column (str): Name of the column in the Excel file that contains the text content.
-        
-        Returns:
-            Pandas DataFrame: Dataframe output from file read
-        """
-        df = pd.read_excel(file_path, engine='openpyxl')
-        #if text_column not in df.columns:
-        #    return f"Column '{text_column}' not found in {file_path}"
-        #text_out = " ".join(df[text_column].dropna().astype(str))
-        return df
 
 def get_file_path_end(file_path):
     match = re.search(r'(.*[\/\\])?(.+)$', file_path)
@@ -232,6 +215,21 @@ def write_out_metadata_as_string(metadata_in):
     metadata_string = [f"{'  '.join(f'{k}: {v}' for k, v in d.items() if k != 'page_section')}" for d in metadata_in] # ['metadata']
     return metadata_string
 
+def combine_metadata_columns(df, cols):
+
+    df['metadatas'] = "{"
+    df['blank_column'] = ""
+
+    for n, col in enumerate(cols):
+        df[col] = df[col].astype(str).str.replace('"',"'").str.cat(df['blank_column'].astype(str), sep="")
+
+        df['metadatas'] = df['metadatas'] + '"' + cols[n] + '": "' + df[col] + '", '
+
+
+    df['metadatas'] = (df['metadatas'] + "}").str.replace(", }", "}")
+
+    return df['metadatas']
+
 def csv_excel_text_to_docs(df, text_column='text', chunk_size=None) -> List[Document]:
     """Converts a DataFrame's content to a list of Documents with metadata."""
     
@@ -249,7 +247,7 @@ def csv_excel_text_to_docs(df, text_column='text', chunk_size=None) -> List[Docu
             if col != text_column:
                 metadata[col] = value
 
-        metadata_string = write_out_metadata_as_string(metadata)[0]      
+        # metadata_string = write_out_metadata_as_string(metadata)[0]      
 
         # If chunk_size is provided, split the text into chunks
         if chunk_size:
@@ -274,6 +272,39 @@ def csv_excel_text_to_docs(df, text_column='text', chunk_size=None) -> List[Docu
             doc_sections.append(doc)
     
     return doc_sections
+
+import ast
+
+def csv_excel_text_to_docs(df, text_column='text', chunk_size=None, progress=gr.Progress()) -> List[Document]:
+    """Converts a DataFrame's content to a list of dictionaries in the 'Document' format, containing page_content and associated metadata."""
+    
+    ingest_tic = time.perf_counter()
+
+    doc_sections = []
+    df[text_column] = df[text_column].astype(str).str.strip() # Ensure column is a string column
+
+    cols = [col for col in df.columns if col != text_column]
+
+    df["metadata"] = combine_metadata_columns(df, cols)
+
+    df = df.rename(columns={text_column:"page_content"})
+
+    #print(df[["page_content", "metadata"]].to_dict(orient='records'))
+
+    #doc_sections = df[["page_content", "metadata"]].to_dict(orient='records')
+    #doc_sections = [Document(**row) for row in df[["page_content", "metadata"]].to_dict(orient='records')]
+
+    # Create a list of Document objects
+    doc_sections = [Document(page_content=row['page_content'], 
+                        metadata= ast.literal_eval(row["metadata"])) 
+               for index, row in progress.tqdm(df.iterrows(), desc = "Splitting up text", unit = "rows")]
+    
+    ingest_toc = time.perf_counter()
+
+    ingest_time_out = f"Preparing documents took {ingest_toc - ingest_tic:0.1f} seconds"
+    print(ingest_time_out)
+
+    return doc_sections, "Finished splitting documents"
 
 # # Functions for working with documents after loading them back in
 
@@ -331,85 +362,3 @@ def docs_elements_from_csv_save(docs_path="documents.csv"):
     doc_sources = [d['source'] for d in docs_meta]
 
     return out_df, docs_content, docs_meta, doc_sources
-
-# ## Create embeddings and save faiss vector store to the path specified in `save_to`
-
-def load_embeddings(model_name = "BAAI/bge-base-en-v1.5"):
-
-    #if model_name == "hkunlp/instructor-large":
-    #    embeddings_func = HuggingFaceInstructEmbeddings(model_name=model_name,
-    #    embed_instruction="Represent the paragraph for retrieval: ",
-    #    query_instruction="Represent the question for retrieving supporting documents: "
-    #    )
-
-    #else: 
-    embeddings_func = HuggingFaceEmbeddings(model_name=model_name)
-
-    global embeddings
-
-    embeddings = embeddings_func
-
-    return embeddings_func
-
-def embed_faiss_save_to_zip(docs_out, save_to="faiss_lambeth_census_embedding", model_name = "BAAI/bge-base-en-v1.5"):
-
-    load_embeddings(model_name=model_name)
-
-    #embeddings_fast = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
-    print(f"> Total split documents: {len(docs_out)}")
-
-    vectorstore = FAISS.from_documents(documents=docs_out, embedding=embeddings)
-        
-
-    if Path(save_to).exists():
-        vectorstore.save_local(folder_path=save_to)
-
-    print("> DONE")
-    print(f"> Saved to: {save_to}")
-
-    ### Save as zip, then remove faiss/pkl files to allow for upload to huggingface
-
-    import shutil
-
-    shutil.make_archive(save_to, 'zip', save_to)
-
-    os.remove(save_to + "/index.faiss")
-    os.remove(save_to + "/index.pkl")
-
-    shutil.move(save_to + '.zip', save_to + "/" + save_to + '.zip')
-
-    return vectorstore
-
-def docs_to_chroma_save(embeddings, docs_out:PandasDataFrame, save_to:str):
-    print(f"> Total split documents: {len(docs_out)}")
-    
-    vectordb = Chroma.from_documents(documents=docs_out, 
-                                 embedding=embeddings,
-                                 persist_directory=save_to)
-    
-    # persiste the db to disk
-    vectordb.persist()
-    
-    print("> DONE")
-    print(f"> Saved to: {save_to}")
-    
-    return vectordb
-
-def sim_search_local_saved_vec(query, k_val, save_to="faiss_lambeth_census_embedding"):
-
-    load_embeddings()
-
-    docsearch = FAISS.load_local(folder_path=save_to, embeddings=embeddings)
-
-
-    display(Markdown(question))
-
-    search = docsearch.similarity_search_with_score(query, k=k_val)
-
-    for item in search:
-        print(item[0].page_content)
-        print(f"Page: {item[0].metadata['source']}")
-        print(f"Date: {item[0].metadata['date']}")
-        print(f"Score: {item[1]}")
-        print("---")

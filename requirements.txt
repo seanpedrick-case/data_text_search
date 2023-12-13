@@ -6,4 +6,6 @@ transformers
 langchain
 chromadb
 torch
+accelerate
+sentence-transformers
 gradio==3.50.0

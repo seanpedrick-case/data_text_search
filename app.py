@@ -8,26 +8,42 @@ nltk.download('punkt')
 from search_funcs.fast_bm25 import BM25
 from search_funcs.clean_funcs import initial_clean, get_lemma_tokens#, stem_sentence
 from nltk import word_tokenize
+#from sentence_transformers import SentenceTransformer
 
 PandasDataFrame = TypeVar('pd.core.frame.DataFrame')
 
 import gradio as gr
 import pandas as pd
 import os
+import time
+from chromadb.config import Settings
 
-from itertools import compress
-
-#from langchain.embeddings import HuggingFaceEmbeddings
-#from langchain.vectorstores import FAISS
 from transformers import AutoModel
 
+# model = AutoModel.from_pretrained('./model_and_tokenizer/int8-model.onnx', use_embedding_runtime=True)
+# sentence_embeddings = model.generate(engine_input)['last_hidden_state:0']
+
+# print("Sentence embeddings:", sentence_embeddings)
+
 import search_funcs.ingest as ing
-import search_funcs.chatfuncs as chatf
+#import search_funcs.chatfuncs as chatf
 
 # Import Chroma and instantiate a client. The default Chroma client is ephemeral, meaning it will not save to disk.
 import chromadb
 #from typing_extensions import Protocol
 #from chromadb import Documents, EmbeddingFunction, Embeddings
+
+from torch import cuda, backends
+
+# Check for torch cuda
+print(cuda.is_available())
+print(backends.cudnn.enabled)
+if cuda.is_available():
+    torch_device = "cuda"
+    os.system("nvidia-smi")
+
+else: 
+    torch_device =  "cpu"
 
 # Remove Chroma database file. If it exists as it can cause issues
 chromadb_file = "chroma.sqlite3"
@@ -176,13 +192,13 @@ def bm25_search(free_text_query, in_no_search_results, original_data, text_colum
         join_df[in_join_column] = join_df[in_join_column].astype(str).str.replace("\.0$","", regex=True)
         results_df_out[search_df_join_column] = results_df_out[search_df_join_column].astype(str).str.replace("\.0$","", regex=True)
 
+        # Duplicates dropped so as not to expand out dataframe
+        join_df = join_df.drop_duplicates(in_join_column)
+
         results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left").drop(in_join_column, axis=1)
     
-
     # Reorder results by score
     results_df_out = results_df_out.sort_values('search_score_abs', ascending=False)
-
-
 
     # Out file
     results_df_name = "search_result.csv"
@@ -227,7 +243,7 @@ def put_columns_in_df(in_file, in_bm25_column):
     df = read_file(in_file.name)
     new_choices = list(df.columns)
 
-    print(new_choices)
+    #print(new_choices)
 
     concat_choices.extend(new_choices)     
         
@@ -279,7 +295,7 @@ def load_embeddings(embeddings_name = "jinaai/jina-embeddings-v2-small-en"):
     # Import Chroma and instantiate a client. The default Chroma client is ephemeral, meaning it will not save to disk.
     
     #else: 
-    embeddings_func = AutoModel.from_pretrained(embeddings_name, trust_remote_code=True)
+    embeddings_func = AutoModel.from_pretrained(embeddings_name, trust_remote_code=True, device_map="auto")
 
     global embeddings
 
@@ -288,10 +304,12 @@ def load_embeddings(embeddings_name = "jinaai/jina-embeddings-v2-small-en"):
     return embeddings
 
 # Load embeddings
-embeddings_name = "jinaai/jina-embeddings-v2-small-en"
-#embeddings_name = "BAAI/bge-base-en-v1.5"
-embeddings_model = AutoModel.from_pretrained(embeddings_name, trust_remote_code=True)
-embeddings = load_embeddings(embeddings_name)
+#embeddings_name = 
+embeddings_model = AutoModel.from_pretrained("jinaai/jina-embeddings-v2-small-en", trust_remote_code=True, device_map="auto")
+#embeddings_model = SentenceTransformer("BAAI/bge-small-en-v1.5")
+#embeddings_model = SentenceTransformer("paraphrase-MiniLM-L3-v2")
+
+embeddings = embeddings_model#load_embeddings(embeddings_name)
 
 def docs_to_chroma_save(docs_out, embeddings = embeddings, progress=gr.Progress()):
     '''
@@ -300,34 +318,91 @@ def docs_to_chroma_save(docs_out, embeddings = embeddings, progress=gr.Progress(
 
     print(f"> Total split documents: {len(docs_out)}")
 
-    #print(docs_out)
+    print(docs_out)
 
     page_contents = [doc.page_content for doc in docs_out]
     page_meta = [doc.metadata for doc in docs_out]
     ids_range = range(0,len(page_contents)) 
     ids = [str(element) for element in ids_range]
 
-    embeddings_list = []
-    for page in progress.tqdm(page_contents, desc = "Preparing search index", unit = "rows"):
-        embeddings_list.append(embeddings.encode(sentences=page, max_length=1024).tolist())
+    tic = time.perf_counter()
+    #embeddings_list = []
+    #for page in progress.tqdm(page_contents, desc = "Preparing search index", unit = "rows"):
+    #    embeddings_list.append(embeddings.encode(sentences=page, max_length=1024).tolist())
+
+    embeddings_list = embeddings.encode(sentences=page_contents, max_length=256).tolist() # For Jina embeddings
+    #embeddings_list = embeddings.encode(sentences=page_contents, normalize_embeddings=True).tolist() # For BGE embeddings
+    #embeddings_list = embeddings.encode(sentences=page_contents).tolist() # For minilm
+
+    toc = time.perf_counter()
+    time_out = f"The embedding took {toc - tic:0.1f} seconds"
+
+    # Jina tiny
+    # This takes about 300 seconds for 240,000 records = 800 / second, 1024 max length
+    # For 50k records:
+    # 61 seconds at 1024 max length
+    # 55 seconds at 512 max length
+    # 43 seconds at 256 max length
+    # 31 seconds at 128 max length
+
+    # BGE small
+    # 96 seconds for 50k records at 512 length
+
+    # all-MiniLM-L6-v2
+    # 42.5 seconds at (256?) max length
+
+    # paraphrase-MiniLM-L3-v2
+    # 22 seconds for 128 max length
 
 
-    client = chromadb.PersistentClient(path=".")
+    print(time_out)
 
-    # Create a new Chroma collection to store the supporting evidence. We don't need to specify an embedding fuction, and the default will be used.
+    chroma_tic = time.perf_counter()
+
+    # Create a new Chroma collection to store the documents and metadata. We don't need to specify an embedding fuction, and the default will be used.
+    client = chromadb.PersistentClient(path="./db", settings=Settings(
+    anonymized_telemetry=False))
+
     try:
-        collection = client.get_collection(name="my_collection")
+        print("Deleting existing collection.")
+        #collection = client.get_collection(name="my_collection")
         client.delete_collection(name="my_collection")
-    except: 
+        print("Creating new collection.")
         collection = client.create_collection(name="my_collection")
-                                          
-    collection.add(
-    documents = page_contents,
-    embeddings = embeddings_list,
-    metadatas = page_meta,
-    ids = ids)
+    except: 
+        print("Creating new collection.")
+        collection = client.create_collection(name="my_collection")
+
+    # Match batch size is about 40,000, so add that amount in a loop
+    def create_batch_ranges(in_list, batch_size=40000):
+        total_rows = len(in_list)
+        ranges = []
+        
+        for start in range(0, total_rows, batch_size):
+            end = min(start + batch_size, total_rows)
+            ranges.append(range(start, end))
+        
+        return ranges
+
+    batch_ranges = create_batch_ranges(embeddings_list)
+    print(batch_ranges)
+
+    for row_range in progress.tqdm(batch_ranges, desc = "Creating vector database", unit = "batches of 40,000 rows"):
+    
+        collection.add(
+        documents = page_contents[row_range[0]:row_range[-1]],
+        embeddings = embeddings_list[row_range[0]:row_range[-1]],
+        metadatas = page_meta[row_range[0]:row_range[-1]],
+        ids = ids[row_range[0]:row_range[-1]])
+
+    print(collection.count())
 
     #chatf.vectorstore = vectorstore_func
+
+    chroma_toc = time.perf_counter()
+
+    chroma_time_out = f"Loading to Chroma db took {chroma_toc - chroma_tic:0.1f} seconds"
+    print(chroma_time_out)
 
     out_message = "Document processing complete"
 
@@ -381,37 +456,45 @@ def chroma_retrieval(new_question_kworded:str, vectorstore, docs, orig_df_col:st
             #df_docs = df#.apply(lambda x: x.explode()).reset_index(drop=True)
 
             # Keep only documents with a certain score
+
+            print(df_docs)
             
             docs_scores = df_docs["distances"] #.astype(float)
 
             # Only keep sources that are sufficiently relevant (i.e. similarity search score below threshold below)
             score_more_limit = df_docs.loc[docs_scores < vec_score_cut_off, :]
-            docs_keep = create_docs_keep_from_df(score_more_limit) #list(compress(docs, score_more_limit))
+            #docs_keep = create_docs_keep_from_df(score_more_limit) #list(compress(docs, score_more_limit))
 
             #print(docs_keep)
 
-            if not docs_keep:
-                return 'No result found!', ""
+            if score_more_limit.empty:
+                return 'No result found!', None
 
             # Only keep sources that are at least 100 characters long
             docs_len = score_more_limit["documents"].str.len() >= 100
-            length_more_limit = score_more_limit.loc[docs_len, :] #pd.Series(docs_len) >= 100
-            docs_keep = create_docs_keep_from_df(length_more_limit) #list(compress(docs_keep, length_more_limit))
+
+            print(docs_len)
+
+            length_more_limit = score_more_limit.loc[docs_len == True, :] #pd.Series(docs_len) >= 100
+            #docs_keep = create_docs_keep_from_df(length_more_limit) #list(compress(docs_keep, length_more_limit))
 
             #print(length_more_limit)
 
-            if not docs_keep:
-                return 'No result found!', ""
+            if length_more_limit.empty:
+                return 'No result found!', None
             
             length_more_limit['ids'] = length_more_limit['ids'].astype(int)
 
             #length_more_limit.to_csv("length_more_limit.csv", index = None)
 
             # Explode the 'metadatas' dictionary into separate columns
-            df_metadata_expanded = df_docs['metadatas'].apply(pd.Series)
+            df_metadata_expanded = length_more_limit['metadatas'].apply(pd.Series)
+
+            print(length_more_limit)
+            print(df_metadata_expanded)
 
             # Concatenate the original DataFrame with the expanded metadata DataFrame
-            results_df_out = pd.concat([df_docs.drop('metadatas', axis=1), df_metadata_expanded], axis=1)
+            results_df_out = pd.concat([length_more_limit.drop('metadatas', axis=1), df_metadata_expanded], axis=1)
 
             results_df_out = results_df_out.rename(columns={"documents":orig_df_col})
 
@@ -428,6 +511,10 @@ def chroma_retrieval(new_question_kworded:str, vectorstore, docs, orig_df_col:st
                 # Import data
                 join_df = read_file(join_filename)
                 join_df[in_join_column] = join_df[in_join_column].astype(str).str.replace("\.0$","", regex=True)
+
+                # Duplicates dropped so as not to expand out dataframe
+                join_df = join_df.drop_duplicates(in_join_column)
+
                 results_df_out[search_df_join_column] = results_df_out[search_df_join_column].astype(str).str.replace("\.0$","", regex=True)
 
                 results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left").drop(in_join_column, axis=1)
@@ -435,7 +522,7 @@ def chroma_retrieval(new_question_kworded:str, vectorstore, docs, orig_df_col:st
 
             results_df_name = "semantic_search_result.csv"
             results_df_out.to_csv(results_df_name, index= None)
-            results_first_text = results_df_out[orig_df_col][0]
+            results_first_text = results_df_out[orig_df_col].iloc[0]
 
             return results_first_text, results_df_name
 
@@ -452,7 +539,7 @@ with block:
 
     k_val = gr.State(9999)
     out_passages = gr.State(9999)
-    vec_score_cut_off = gr.State(100)
+    vec_score_cut_off = gr.State(70)
     vec_weight = gr.State(1)
 
     docs_keep_as_doc_state = gr.State()
@@ -512,7 +599,7 @@ depends on factors such as the type of documents or queries. Information taken f
         with gr.Accordion("Load in data", open = True):
             in_semantic_file = gr.File(label="Upload data file for semantic search")
             in_semantic_column = gr.Dropdown(label="Enter the name of the text column in the data file to search")
-            load_semantic_data_button = gr.Button(value="Load in CSV/Excel file", variant="secondary", scale=0)
+            load_semantic_data_button = gr.Button(value="Load in data file", variant="secondary", scale=0)
         
         ingest_embed_out = gr.Textbox(label="File/web page preparation progress")
         semantic_query = gr.Textbox(label="Enter semantic search query here")
@@ -572,7 +659,7 @@ depends on factors such as the type of documents or queries. Information taken f
     # Load in a csv/excel file for semantic search
     in_semantic_file.upload(put_columns_in_df, inputs=[in_semantic_file, in_semantic_column], outputs=[in_semantic_column, in_clean_data, search_df_join_column])
     load_semantic_data_button.click(ing.parse_csv_or_excel, inputs=[in_semantic_file, in_semantic_column], outputs=[ingest_text, current_source_semantic]).\
-             then(ing.csv_excel_text_to_docs, inputs=[ingest_text, in_semantic_column], outputs=[ingest_docs]).\
+             then(ing.csv_excel_text_to_docs, inputs=[ingest_text, in_semantic_column], outputs=[ingest_docs, load_finished_message]).\
              then(docs_to_chroma_save, inputs=[ingest_docs], outputs=[ingest_embed_out, vectorstore_state])
     
     # Semantic search query
