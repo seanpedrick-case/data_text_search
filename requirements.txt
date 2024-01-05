@@ -9,4 +9,5 @@ torch
 accelerate
 sentence-transformers
 spacy
+polars
 gradio==3.50.0
