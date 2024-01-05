@@ -36,9 +36,6 @@ class Document(BaseModel):
     """
     type: Literal["Document"] = "Document"
 
-
-# -
-
 split_strat = ["\n\n", "\n", ". ", "! ", "? "]
 chunk_size = 500
 chunk_overlap = 0
@@ -221,7 +218,6 @@ def text_to_docs(text_dict: dict, chunk_size: int = chunk_size) -> List[Document
 
     return doc_sections#, page_docs
 
-
 def write_out_metadata_as_string(metadata_in):
     # If metadata_in is a single dictionary, wrap it in a list
     if isinstance(metadata_in, dict):
@@ -300,8 +296,6 @@ def csv_excel_text_to_docs(df, text_column='text', chunk_size=None) -> List[Docu
         print(message)
 
     return doc_sections, message
-
-
 
 def clean_line_breaks(text):
     # Replace \n and \r\n with a space

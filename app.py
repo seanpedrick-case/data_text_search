@@ -19,6 +19,8 @@ import pandas as pd
 import numpy as np
 import os
 import time
+import math
+from itertools import islice
 from chromadb.config import Settings
 
 from transformers import AutoModel
@@ -124,28 +126,14 @@ def prepare_input_data(in_file, text_column, clean="No", progress=gr.Progress())
 
     #df = pd.read_parquet(file_in.name)
     df_list = list(df[text_column].astype(str).str.lower())
-    #df_list = df
 
-    import math
-
-    def get_total_batches(my_list, batch_size):
-        return math.ceil(len(my_list) / batch_size)
-
-    from itertools import islice
-
-    def batch(iterable, batch_size):
-        iterator = iter(iterable)
-        for first in iterator:
-            yield [first] + list(islice(iterator, batch_size - 1))
-
-    #def batch(my_list, batch_size):
-    # Splitting the list into batches
-    #    for i in range(0, len(my_list), batch_size):
-    #        batch = my_list[i:i + batch_size]
-
-            # Process each batch
-            # Replace this with your processing logic
-            #print("Processing batch:", batch)
+    # def get_total_batches(my_list, batch_size):
+    #     return math.ceil(len(my_list) / batch_size)
+  
+    # def batch(iterable, batch_size):
+    #     iterator = iter(iterable)
+    #     for first in iterator:
+    #         yield [first] + list(islice(iterator, batch_size - 1))
 
     batch_size = 256
 
@@ -157,29 +145,7 @@ def prepare_input_data(in_file, text_column, clean="No", progress=gr.Progress())
         # Save to file if you have cleaned the data
         out_file_name = save_prepared_data(in_file, df_list_clean, df, text_column)
 
-        #corpus = [word_tokenize(doc.lower()) for doc in df_list_clean]
-        #corpus = [word_tokenize(doc.lower()) for doc in progress.tqdm(df_list_clean, desc = "Tokenising text", unit = "rows")]
-
-        #total_batches = get_total_batches(df_list_clean, batch_size)
-        #data_batched = batch(df_list_clean, batch_size)
         
-        #print(data_batched)
-
-        #print(df_list_clean[0])
-
-        # Using encode_batch
-        #encodings = tokenizer.encode_batch(texts)
-
-        # Extracting tokens
-        #tokens_list = [encoding.tokens for encoding in encodings]
-
-        #corpus = [tokenizer(doc.lower()) for doc in progress.tqdm(df_list_clean, desc = "Tokenising text", unit = "rows")]
-        #corpus = [tokenizer.encode(doc_batch) for doc_batch in progress.tqdm(data_batched, desc = "Tokenising text", unit = "batches out of " + str(total_batches))] # for jina
-        # print(df_list_clean)
-        # corpus = tokenizer.batch_encode_plus(df_list_clean).tokens
-
-        #corpus = [[token.text for token in nlp(text)] for text in df_list_clean]
-
         # Tokenize texts in batches
         if not tokenised_df.empty:
             corpus = tokenised_df.iloc[:,0].tolist()
@@ -189,24 +155,11 @@ def prepare_input_data(in_file, text_column, clean="No", progress=gr.Progress())
             corpus = []
             for doc in tokenizer.pipe(progress.tqdm(df_list_clean, desc = "Tokenising text", unit = "rows"), batch_size=batch_size):
                 corpus.append([token.text for token in doc])
-            #for doc in nlp.pipe(progress.tqdm(df_list_clean, desc = "Tokenising text", unit = "batches out of " + str(total_batches)), batch_size=batch_size):  # You can adjust batch_size based on your requirement
-            #    corpus.append([token.text for token in doc])
-
-
+            
     else: 
-        #total_batches = get_total_batches(df_list, batch_size)
-        #data_batched = batch(df_list, batch_size)
-
-        #print(data_batched)
-
-        #corpus = [word_tokenize(doc.lower()) for doc in df_list]
-        #corpus = [word_tokenize(doc.lower()) for doc in progress.tqdm(df_list, desc = "Tokenising text", unit = "rows")]
-        #corpus = [tokenizer.encode(doc_batch) for doc_batch in progress.tqdm(data_batched, desc = "Tokenising text", unit = "batches out of " + str(total_batches))] # for jina
-        #corpus = tokenizer.batch_encode_plus(df_list).tokens # for jina
-
+        
         print(df_list[0])
-        #corpus = [[token.text for token in nlp(text)] for text in df_list]
-
+        
         # Tokenize texts in batches
         if not tokenised_df.empty:
             corpus = tokenised_df.iloc[:,0].tolist()
@@ -216,10 +169,8 @@ def prepare_input_data(in_file, text_column, clean="No", progress=gr.Progress())
 
             corpus = []
             for doc in tokenizer.pipe(progress.tqdm(df_list, desc = "Tokenising text", unit = "rows"), batch_size=batch_size):
-            #for doc in nlp.pipe(progress.tqdm(df_list, desc = "Tokenising text", unit = "batches out of " + str(total_batches)), #batch_size=batch_size):  # You can adjust batch_size based on your requirement
                 corpus.append([token.text for token in doc])
         
-        #corpus = tokenizer(df_list)
         out_file_name = None
 
         print(corpus[0])
@@ -235,9 +186,10 @@ def prepare_input_data(in_file, text_column, clean="No", progress=gr.Progress())
     else:
         message = "Data loaded. Warning: dataset may be too short to get consistent search results."
 
-    pd.DataFrame(data={"Corpus":corpus}).to_parquet("keyword_search_tokenised_data.parquet")
+    tokenised_data_file_name = "keyword_search_tokenised_data.parquet"
+    pd.DataFrame(data={"Corpus":corpus}).to_parquet(tokenised_data_file_name)
     
-    return corpus, message, df, out_file_name
+    return corpus, message, df, out_file_name, tokenised_data_file_name
 
 def get_file_path_end(file_path):
     # First, get the basename of the file (e.g., "example.txt" from "/path/to/example.txt")
@@ -551,12 +503,14 @@ def docs_to_np_array(docs_out, in_file, embeddings = embeddings, progress=gr.Pro
     ## Load in pre-embedded file if exists
     file_list = [string.name for string in in_file]
 
-    print(file_list)
+    #print(file_list)
 
     embeddings_file_names = [string for string in file_list if "embedding" in string]
 
+    out_message = "Document processing complete. Ready to search."
+
     if embeddings_file_names:
-        embeddings_out = np.load(embeddings_file_names[0])
+        embeddings_out = np.load(embeddings_file_names[0])['arr_0']
         print("embeddings loaded: ", embeddings_out)
 
     if not embeddings_file_names:
@@ -568,16 +522,24 @@ def docs_to_np_array(docs_out, in_file, embeddings = embeddings, progress=gr.Pro
         embeddings_out = embeddings.encode(sentences=page_contents, max_length=1024, show_progress_bar = True, batch_size = 32) # For Jina embeddings
         #embeddings_list = embeddings.encode(sentences=page_contents, normalize_embeddings=True).tolist() # For BGE embeddings
         #embeddings_list = embeddings.encode(sentences=page_contents).tolist() # For minilm
+        
+        print(embeddings_out)
+        embeddings_out_round = np.round(embeddings_out, 4)
 
         toc = time.perf_counter()
         time_out = f"The embedding took {toc - tic:0.1f} seconds"
 
-        np.savez_compressed('semantic_search_embeddings.npz', embeddings_out)
+        semantic_search_file_name = 'semantic_search_embeddings.npz'
+        semantic_search_rounded_file_name = 'semantic_search_embeddings_rounded.npz'
 
-    out_message = "Document processing complete. Ready to search."
+        np.savez_compressed(semantic_search_file_name, embeddings_out)
+        np.savez_compressed(semantic_search_rounded_file_name, embeddings_out_round)
+
+        return out_message, embeddings_out, semantic_search_file_name, semantic_search_rounded_file_name
+    
     print(out_message)
 
-    return out_message, embeddings_out
+    return out_message, embeddings_out, None, None
 
 def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_cut_off, vec_weight, orig_df_col, in_join_column, search_df_join_column):
 
@@ -787,7 +749,7 @@ depends on factors such as the type of documents or queries. Information taken f
             current_source = gr.Textbox(label="Current data source(s)", value="None")
 
         with gr.Accordion(label = "Load in data", open=True):
-            in_bm25_file = gr.File(label="Upload your search data here", file_count= 'multiple', file_types = ['.parquet', '.csv'])
+            in_bm25_file = gr.File(label="Upload data for keyword search", file_count= 'multiple', file_types = ['.parquet', '.csv'])
             with gr.Row():
                 in_bm25_column = gr.Dropdown(label="Enter the name of the text column in the data file to search") 
                 load_bm25_data_button = gr.Button(value="Load data")
@@ -815,9 +777,9 @@ depends on factors such as the type of documents or queries. Information taken f
             
             with gr.Row():
                 in_semantic_column = gr.Dropdown(label="Enter the name of the text column in the data file to search")
-                load_semantic_data_button = gr.Button(value="Load in data file", variant="secondary")
+                load_semantic_data_button = gr.Button(value="Load data", variant="secondary")
                 
-            ingest_embed_out = gr.Textbox(label="File/web page preparation progress")
+            semantic_load_progress = gr.Textbox(label="Load progress")
         
         semantic_query = gr.Textbox(label="Enter semantic search query here")
         semantic_submit = gr.Button(value="Start semantic search", variant="secondary", scale = 1)
@@ -865,25 +827,25 @@ depends on factors such as the type of documents or queries. Information taken f
     in_join_file.upload(put_columns_in_join_df, inputs=[in_join_file, in_join_column], outputs=[in_join_column])
  
     # Load in BM25 data
-    load_bm25_data_button.click(fn=prepare_input_data, inputs=[in_bm25_file, in_bm25_column, in_clean_data], outputs=[corpus_state, load_finished_message, data_state, output_file]).\
+    load_bm25_data_button.click(fn=prepare_input_data, inputs=[in_bm25_file, in_bm25_column, in_clean_data], outputs=[corpus_state, load_finished_message, data_state, output_file, output_file]).\
     then(fn=prepare_bm25, inputs=[corpus_state, in_k1, in_b, in_alpha], outputs=[load_finished_message]).\
     then(fn=put_columns_in_df, inputs=[in_bm25_file, in_bm25_column], outputs=[in_bm25_column, in_clean_data, search_df_join_column])
    
     # BM25 search functions on click or enter
-    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file, mod_query], api_name="search")
+    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file, mod_query], api_name="keyword")
     keyword_query.submit(fn=bm25_search, inputs=[keyword_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file, mod_query])
     
     ### SEMANTIC SEARCH ###
     # Load in a csv/excel file for semantic search
     in_semantic_file.upload(put_columns_in_df, inputs=[in_semantic_file, in_semantic_column], outputs=[in_semantic_column, in_clean_data, search_df_join_column])
-    load_semantic_data_button.click(ing.parse_csv_or_excel, inputs=[in_semantic_file, in_semantic_column], outputs=[ingest_text, current_source_semantic, ingest_embed_out]).\
-             then(ing.csv_excel_text_to_docs, inputs=[ingest_text, in_semantic_column], outputs=[ingest_docs, ingest_embed_out]).\
-             then(docs_to_np_array, inputs=[ingest_docs, in_semantic_file], outputs=[ingest_embed_out, vectorstore_state])
+    load_semantic_data_button.click(ing.parse_csv_or_excel, inputs=[in_semantic_file, in_semantic_column], outputs=[ingest_text, current_source_semantic, semantic_load_progress]).\
+             then(ing.csv_excel_text_to_docs, inputs=[ingest_text, in_semantic_column], outputs=[ingest_docs, semantic_load_progress]).\
+             then(docs_to_np_array, inputs=[ingest_docs, in_semantic_file], outputs=[semantic_load_progress, vectorstore_state, semantic_output_file, semantic_output_file])
     
     # Semantic search query
     semantic_submit.click(jina_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, vec_score_cut_off, vec_weight, in_join_file, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic")
 
-    semantic_query.submit(jina_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, vec_score_cut_off, vec_weight, in_join_file, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic")
+    semantic_query.submit(jina_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, vec_score_cut_off, vec_weight, in_join_file, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file])
     
     # Dummy functions just to get dropdowns to work correctly with Gradio 3.50
     in_bm25_column.change(dummy_function, in_bm25_column, None)
