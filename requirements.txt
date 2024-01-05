@@ -8,4 +8,5 @@ chromadb
 torch
 accelerate
 sentence-transformers
+spacy
 gradio==3.50.0

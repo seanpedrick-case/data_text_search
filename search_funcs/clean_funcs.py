@@ -19,6 +19,7 @@
 import nltk
 import re
 import string
+import polars as pl
 from nltk.stem import WordNetLemmatizer
 from nltk.stem import PorterStemmer
 from nltk.corpus import wordnet as wn
@@ -122,15 +123,25 @@ def initial_clean(texts):
         clean_texts.append(text)
     return clean_texts
 '''
+
+email_start_pattern_regex = r'.*importance:|.*subject:'
+email_end_pattern_regex = r'kind regards.*|many thanks.*|sincerely.*'
+html_pattern_regex = r'<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});|\xa0|&nbsp;'
+email_pattern_regex = r'\S*@\S*\s?'
+num_pattern_regex = r'[0-9]+'
+postcode_pattern_regex = r'(\b(?:[A-Z][A-HJ-Y]?[0-9][0-9A-Z]? ?[0-9][A-Z]{2})|((GIR ?0A{2})\b$)|(?:[A-Z][A-HJ-Y]?[0-9][0-9A-Z]? ?[0-9]{1}?)$)|(\b(?:[A-Z][A-HJ-Y]?[0-9][0-9A-Z]?)\b$)'
+warning_pattern_regex = r'caution: this email originated from outside of the organization. do not click links or open attachments unless you recognize the sender and know the content is safe.'
+nbsp_pattern_regex = r'&nbsp;'
+
 # Pre-compiling the regular expressions for efficiency
-email_start_pattern = re.compile('.*importance:|.*subject:')
-email_end_pattern = re.compile('kind regards.*|many thanks.*|sincerely.*')
-html_pattern = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});|\xa0')
-email_pattern = re.compile('\S*@\S*\s?')
-num_pattern = re.compile(r'[0-9]+')
-postcode_pattern = re.compile(r'(\b(?:[A-Z][A-HJ-Y]?[0-9][0-9A-Z]? ?[0-9][A-Z]{2})|((GIR ?0A{2})\b$)|(?:[A-Z][A-HJ-Y]?[0-9][0-9A-Z]? ?[0-9]{1}?)$)|(\b(?:[A-Z][A-HJ-Y]?[0-9][0-9A-Z]?)\b$)')
-warning_pattern = re.compile('caution: this email originated from outside of the organization. do not click links or open attachments unless you recognize the sender and know the content is safe.')
-nbsp_pattern = re.compile(r'&nbsp;')
+email_start_pattern = re.compile(email_start_pattern_regex)
+email_end_pattern = re.compile(email_end_pattern_regex)
+html_pattern = re.compile(html_pattern_regex)
+email_pattern = re.compile(email_end_pattern_regex)
+num_pattern = re.compile(num_pattern_regex)
+postcode_pattern = re.compile(postcode_pattern_regex)
+warning_pattern = re.compile(warning_pattern_regex)
+nbsp_pattern = re.compile(nbsp_pattern_regex)
 
 def stem_sentence(sentence):
 
@@ -142,8 +153,6 @@ def stem_sentences(sentences, progress=gr.Progress()):
         """Stem each sentence in a list of sentences."""
         stemmed_sentences = [stem_sentence(sentence) for sentence in progress.tqdm(sentences)]
         return stemmed_sentences
-
-
 
 def get_lemma_text(text):
     # Tokenize the input string into words
@@ -178,30 +187,60 @@ def get_lemma_tokens(tokens):
             lemmas.append(lemma)
     return lemmas
 
+# def initial_clean(texts , progress=gr.Progress()):
+#     clean_texts = []
+
+#     i = 1
+#     #progress(0, desc="Cleaning texts")
+#     for text in progress.tqdm(texts, desc = "Cleaning data", unit = "rows"):
+#         #print("Cleaning row: ", i)
+#         text = re.sub(email_start_pattern, '', text)
+#         text = re.sub(email_end_pattern, '', text)
+#         text = re.sub(postcode_pattern, '', text)
+#         text = remove_hyphens(text)  
+#         text = re.sub(html_pattern, '', text)
+#         text = re.sub(email_pattern, '', text)
+#         text = re.sub(nbsp_pattern, '', text)
+#         #text = re.sub(warning_pattern, '', text)
+#         #text = stem_sentence(text)
+#         text = get_lemma_text(text)
+#         text = ' '.join(text)
+#         # Uncomment the next line if you want to remove numbers as well
+#         # text = re.sub(num_pattern, '', text)        
+#         clean_texts.append(text)
+
+#         i += 1
+#     return clean_texts
+
+
 def initial_clean(texts , progress=gr.Progress()):
-    clean_texts = []
+    texts = pl.Series(texts)#[]
 
-    i = 1
+    #i = 1
     #progress(0, desc="Cleaning texts")
-    for text in progress.tqdm(texts, desc = "Cleaning data", unit = "rows"):
-        #print("Cleaning row: ", i)
-        text = re.sub(email_start_pattern, '', text)
-        text = re.sub(email_end_pattern, '', text)
-        text = re.sub(postcode_pattern, '', text)
-        text = remove_hyphens(text)  
-        text = re.sub(html_pattern, '', text)
-        text = re.sub(email_pattern, '', text)
-        text = re.sub(nbsp_pattern, '', text)
-        #text = re.sub(warning_pattern, '', text)
-        #text = stem_sentence(text)
-        text = get_lemma_text(text)
-        text = ' '.join(text)
-        # Uncomment the next line if you want to remove numbers as well
-        # text = re.sub(num_pattern, '', text)        
-        clean_texts.append(text)
+    #for text in progress.tqdm(texts, desc = "Cleaning data", unit = "rows"):
+    #print("Cleaning row: ", i)
+    text = texts.str.replace_all(email_start_pattern_regex, '')
+    text = text.str.replace_all(email_end_pattern_regex, '')
+    #text = re.sub(postcode_pattern, '', text)
+    #text = remove_hyphens(text)  
+    text = text.str.replace_all(html_pattern_regex, '')
+    text = text.str.replace_all(email_pattern_regex, '')
+    #text = re.sub(nbsp_pattern, '', text)
+    #text = re.sub(warning_pattern, '', text)
+    #text = stem_sentence(text)
+    #text = get_lemma_text(text)
+    #text = ' '.join(text)
+    # Uncomment the next line if you want to remove numbers as well
+    # text = re.sub(num_pattern, '', text)        
+    #clean_texts.append(text)
 
-        i += 1
-    return clean_texts
+    #i += 1
+
+    text = text.to_list()
+    
+    return text
+
 
 # Sample execution
 #sample_texts = [

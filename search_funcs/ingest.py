@@ -3,9 +3,11 @@
 import os
 import time
 import re
+import ast
 import pandas as pd
 import gradio as gr
 from typing import Type, List, Literal
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from pydantic import BaseModel, Field
 
@@ -132,30 +134,43 @@ def parse_csv_or_excel(file_path, text_column = "text"):
 
         #out_df = pd.DataFrame()
 
+        file_list = [string.name for string in file_path]
+
+        print(file_list)
+
+        data_file_names = [string for string in file_list if "tokenised" not in string]
+        
+        
         #for file_path in file_paths:
-        file_extension = determine_file_type(file_path.name)
-        file_name = get_file_path_end(file_path.name)
+        file_extension = determine_file_type(data_file_names[0])
+        file_name = get_file_path_end(data_file_names[0])
         file_names = [file_name]
 
+        print(file_extension)
+
         if file_extension == ".csv":
-                df = pd.read_csv(file_path.name, low_memory=False)
+                df = pd.read_csv(data_file_names[0], low_memory=False)
                 if text_column not in df.columns: return pd.DataFrame(), ['Please choose a valid column name']
                 df['source'] = file_name
                 df['page_section'] = ""
         elif file_extension == ".xlsx":
-                df = pd.read_excel(file_path.name, engine='openpyxl')
+                df = pd.read_excel(data_file_names[0], engine='openpyxl')
                 if text_column not in df.columns: return pd.DataFrame(), ['Please choose a valid column name']
                 df['source'] = file_name
                 df['page_section'] = ""
         elif file_extension == ".parquet":
-                df = pd.read_parquet(file_path.name)
+                df = pd.read_parquet(data_file_names[0])
                 if text_column not in df.columns: return pd.DataFrame(), ['Please choose a valid column name']
                 df['source'] = file_name
                 df['page_section'] = ""
         else:
                 print(f"Unsupported file type: {file_extension}")
                 return pd.DataFrame(), ['Please choose a valid file type']
-        return df, file_names
+        
+        message = "Loaded in file. Now converting to document format."
+        print(message)
+
+        return df, file_names, message
 
 def get_file_path_end(file_path):
     match = re.search(r'(.*[\/\\])?(.+)$', file_path)
@@ -221,18 +236,22 @@ def combine_metadata_columns(df, cols):
     df['blank_column'] = ""
 
     for n, col in enumerate(cols):
-        df[col] = df[col].astype(str).str.replace('"',"'").str.cat(df['blank_column'].astype(str), sep="")
+        df[col] = df[col].astype(str).str.replace('"',"'").str.replace('\n', ' ').str.replace('\r', ' ').str.replace('\r\n', ' ').str.cat(df['blank_column'].astype(str), sep="")
 
         df['metadatas'] = df['metadatas'] + '"' + cols[n] + '": "' + df[col] + '", '
 
 
-    df['metadatas'] = (df['metadatas'] + "}").str.replace(", }", "}")
+    df['metadatas'] = (df['metadatas'] + "}").str.replace(', }', '}')
 
     return df['metadatas']
 
 def csv_excel_text_to_docs(df, text_column='text', chunk_size=None) -> List[Document]:
     """Converts a DataFrame's content to a list of Documents with metadata."""
     
+    #print(df.head())
+
+    print("Converting to documents.")
+
     doc_sections = []
     df[text_column] = df[text_column].astype(str) # Ensure column is a string column
 
@@ -247,33 +266,67 @@ def csv_excel_text_to_docs(df, text_column='text', chunk_size=None) -> List[Docu
             if col != text_column:
                 metadata[col] = value
 
-        # metadata_string = write_out_metadata_as_string(metadata)[0]      
+        metadata_string = write_out_metadata_as_string(metadata)[0]      
 
         # If chunk_size is provided, split the text into chunks
         if chunk_size:
             # Assuming you have a text splitter function similar to the PDF handling
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=chunk_size,
-                # Other arguments as required by the splitter
-            )
+               chunk_size=chunk_size,
+               chunk_overlap=chunk_overlap,
+               split_strat=split_strat,
+               start_index=start_index                
+            ) #Other arguments as required by the splitter
+
             sections = text_splitter.split_text(doc_content)
 
             
             # For each section, create a Document object
             for i, section in enumerate(sections):
-                #section = '. '.join([metadata_string, section])
+                section = '. '.join([metadata_string, section])
                 doc = Document(page_content=section, 
-                               metadata={**metadata, "section": i, "row_section": f"{metadata['row']}-{i}"})
+                              metadata={**metadata, "section": i, "row_section": f"{metadata['row']}-{i}"})
                 doc_sections.append(doc)
+            
+            #print("Chunking currently disabled")
+
         else:
             # If no chunk_size is provided, create a single Document object for the row
             #doc_content = '. '.join([metadata_string, doc_content])
             doc = Document(page_content=doc_content, metadata=metadata)
             doc_sections.append(doc)
-    
-    return doc_sections
 
-import ast
+        message = "Data converted to document format. Now creating/loading document embeddings."
+        print(message)
+
+    return doc_sections, message
+
+
+
+def clean_line_breaks(text):
+    # Replace \n and \r\n with a space
+    return text.replace('\n', ' ').replace('\r', ' ').replace('\r\n', ' ')
+
+def parse_metadata(row):
+    try:
+        # Ensure the 'title' field is a string and clean line breaks
+        #if 'TITLE' in row:
+        #    row['TITLE'] = clean_line_breaks(row['TITLE'])
+
+        # Convert the row to a string if it's not already
+        row_str = str(row) if not isinstance(row, str) else row
+
+        row_str.replace('\n', ' ').replace('\r', ' ').replace('\r\n', ' ')
+
+        # Parse the string
+        metadata = ast.literal_eval(row_str)
+        # Process metadata
+        return metadata
+    except SyntaxError as e:
+        print(f"Failed to parse metadata: {row_str}")
+        print(f"Error: {e}")
+        # Handle the error or log it
+        return None  # or some default value
 
 def csv_excel_text_to_docs(df, text_column='text', chunk_size=None, progress=gr.Progress()) -> List[Document]:
     """Converts a DataFrame's content to a list of dictionaries in the 'Document' format, containing page_content and associated metadata."""
@@ -296,7 +349,7 @@ def csv_excel_text_to_docs(df, text_column='text', chunk_size=None, progress=gr.
 
     # Create a list of Document objects
     doc_sections = [Document(page_content=row['page_content'], 
-                        metadata= ast.literal_eval(row["metadata"])) 
+                        metadata= parse_metadata(row["metadata"]))
                for index, row in progress.tqdm(df.iterrows(), desc = "Splitting up text", unit = "rows")]
     
     ingest_toc = time.perf_counter()

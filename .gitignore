@@ -11,6 +11,8 @@
 *.pkl
 *.spec
 *.ipynb
+*.npy
+*.npz
 build/*
 dist/*
 __pycache__/*
