@@ -870,8 +870,8 @@ depends on factors such as the type of documents or queries. Information taken f
     then(fn=put_columns_in_df, inputs=[in_bm25_file, in_bm25_column], outputs=[in_bm25_column, in_clean_data, search_df_join_column])
    
     # BM25 search functions on click or enter
-    keyword_search_button.click(fn=bm25_search, inputs=[in_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file, mod_query], api_name="search")
-    keyword_query.submit(fn=bm25_search, inputs=[in_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file, mod_query])
+    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file, mod_query], api_name="search")
+    keyword_query.submit(fn=bm25_search, inputs=[keyword_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file, mod_query])
     
     ### SEMANTIC SEARCH ###
     # Load in a csv/excel file for semantic search
