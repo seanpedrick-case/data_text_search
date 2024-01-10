@@ -13,7 +13,11 @@
 *.ipynb
 *.npy
 *.npz
+*.pkl
+*.pkl.gz
 build/*
 dist/*
 __pycache__/*
 db/*
+experiments/*
+model/*

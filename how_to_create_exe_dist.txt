@@ -4,18 +4,26 @@
 
 3. cd to this folder. Install packages from requirements.txt using 'pip install -r requirements.txt' 
 
+NOTE: for ensuring that spaCy models are loaded into the program correctly in requirements.txt, follow this guide: https://spacy.io/usage/models#models-download
+
 4. In file explorer, navigate to the miniconda/envs/new_env/Lib/site-packages/gradio-client/ folder
 
 5. Copy types.json from the gradio_client folder to the folder containing the data_text_search.py file
 
-6. pip install pyinstaller
+6. If necessary, create hook- files to tell pyinstaller to include specific packages in the exe build. Examples are provided for gradio and en_core_web_sm (a spaCy model).
 
-7. In command line, cd to this folder. Then run the following 'python -m PyInstaller --additional-hooks-dir=. --hidden-import pyarrow.vendored.version --add-data="types.json;gradio_client" --clean --onefile --clean --name DataSearchApp data_text_search.py'
+7. pip install pyinstaller
 
-8. A 'dist' folder will be created with the executable inside along with all dependencies('dist\data_text_search'). 
+8. In command line, cd to the folder that contains app.py. Then run the following:
 
-9. In file explorer, navigate to the miniconda/envs/new_env/Lib/site-packages/gradio/ folder. Copy the entire folder. Paste this into the new distributable subfolder 'dist\data_text_search\_internal'
+For one single file:
+python -m PyInstaller --additional-hooks-dir=. --hidden-import pyarrow.vendored.version --add-data="types.json;gradio_client" --add-data "model;model" --onefile --clean --noconfirm --upx-dir="C:\Program Files\UPX\upx-4.2.2-win64" --name DataSearchApp_0.1 app.py
 
-10. In 'dist\data_text_search' try double clicking on the .exe file. After a short delay, the command prompt should inform you about the ip address of the app that is now running. Copy the ip address, but do not close this window.
+For a small exe with a folder of dependencies:
+python -m PyInstaller --additional-hooks-dir=. --hidden-import pyarrow.vendored.version --add-data="types.json;gradio_client" --add-data "model;model" --clean --noconfirm --upx-dir="C:\Program Files\UPX\upx-4.2.2-win64" --name DataSearchApp_0.1 app.py
+
+9. A 'dist' folder will be created with the executable inside along with all dependencies('dist\data_text_search'). 
+
+10. In 'dist\data_text_search' try double clicking on the .exe file. After a short delay, the command prompt should inform you about the IP address of the app that is now running. Copy the IP address. **Do not close this window!**
 
 11. In an Internet browser, navigate to the indicated IP address. The app should now be running in your browser window.
