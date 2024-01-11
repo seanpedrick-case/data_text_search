@@ -58,7 +58,7 @@ depends on factors such as the type of documents or queries. Information taken f
     """
     **Exact term keyword search**
     
-    1. Load in data file (ideally a file with '_cleaned' at the end of the name), with (optionally) the '...tokenised_data.parquet' in the same folder to save loading time. 2. Select the field in your data to search. Ideally this will have the suffix '_cleaned' to show that html tags have been removed. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the relevant box below and press Enter/click on 'Search text'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
+    1. Load in data file (ideally a file with '_cleaned' at the end of the name), with (optionally) the '...tokenised.parquet' in the same folder to save loading time. 2. Select the field in your data to search. A field with the suffix '_cleaned' means that html tags have been removed. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the relevant box below and press Enter/click on 'Search text'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
     """)
         with gr.Row():
             current_source = gr.Textbox(label="Current data source(s)", value="None")
@@ -88,7 +88,7 @@ depends on factors such as the type of documents or queries. Information taken f
     """
     **Thematic/semantic search**
 
-    This search type enables you to search for broader themes (e.g. happiness, nature) and the search will pick out text passages that relate to these themes even if they don't contain the exact words. 1. Load in data file (ideally a file with '_cleaned' at the end of the name), with (optionally) the 'semantic_search_embeddings.npz' in the same folder to save loading time. 2. Select the field in your data to search. Ideally this will have the suffix '_cleaned' to show that html tags have been removed. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the 'Enter semantic search query here' box below and press Enter/click on 'Start semantic search'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
+    This search type enables you to search for broader themes (e.g. happiness, nature) and the search will pick out text passages that relate to these themes even if they don't contain the exact words. 1. Load in data file (ideally a file with '_cleaned' at the end of the name, a pkl.gz file), with (optionally) the 'embeddings... .npz' file in the same folder to save loading time. 2. Select the field in your data to search. If you loaded in a documents pkl.gz file, this will be 'page_contents'. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the 'Enter semantic search query here' box below and press Enter/click on 'Start semantic search'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
     """)
         with gr.Row():
             current_source_semantic = gr.Textbox(label="Current data source(s)", value="None")

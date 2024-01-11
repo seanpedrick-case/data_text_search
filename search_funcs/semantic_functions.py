@@ -96,10 +96,10 @@ def docs_to_jina_embed_np_array(docs_out, in_file, return_intermediate_files = "
     ## Load in pre-embedded file if exists
     file_list = [string.name for string in in_file]
 
-    #print(file_list)
+    print(file_list)
 
-    embeddings_file_names = [string for string in file_list if "embedding" in string]
-    data_file_names = [string for string in file_list if "tokenised" not in string]
+    embeddings_file_names = [string.lower() for string in file_list if "npz" in string.lower()]
+    data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
     data_file_name = data_file_names[0]
     data_file_name_no_ext = get_file_path_end(data_file_name)
 
@@ -110,7 +110,7 @@ def docs_to_jina_embed_np_array(docs_out, in_file, return_intermediate_files = "
         embeddings_out = np.load(embeddings_file_names[0])['arr_0']
 
         # If embedding files have 'super_compress' in the title, they have been multiplied by 100 before save
-        if "super_compress" in embeddings_file_names[0]:
+        if "compress" in embeddings_file_names[0]:
             embeddings_out /= 100
 
         # print("embeddings loaded: ", embeddings_out)
@@ -125,8 +125,6 @@ def docs_to_jina_embed_np_array(docs_out, in_file, return_intermediate_files = "
         embeddings_out = embeddings.encode(sentences=page_contents, max_length=1024, show_progress_bar = True, batch_size = 32) # For Jina embeddings
         #embeddings_list = embeddings.encode(sentences=page_contents, normalize_embeddings=True).tolist() # For BGE embeddings
         #embeddings_list = embeddings.encode(sentences=page_contents).tolist() # For minilm
-        
-        
 
         toc = time.perf_counter()
         time_out = f"The embedding took {toc - tic:0.1f} seconds"
@@ -135,10 +133,10 @@ def docs_to_jina_embed_np_array(docs_out, in_file, return_intermediate_files = "
         # If you want to save your files for next time
         if return_intermediate_files == "Yes":
             if embeddings_super_compress == "No":
-                semantic_search_file_name = data_file_name_no_ext + '_' + 'semantic_search_embeddings.npz'
+                semantic_search_file_name = data_file_name_no_ext + '_' + 'embeddings.npz'
                 np.savez_compressed(semantic_search_file_name, embeddings_out)
             else:
-                semantic_search_file_name = data_file_name_no_ext + '_' + 'semantic_search_embeddings_super_compress.npz'
+                semantic_search_file_name = data_file_name_no_ext + '_' + 'embedding_compress.npz'
                 embeddings_out_round = np.round(embeddings_out, 3) 
                 embeddings_out_round *= 100 # Rounding not currently used
                 np.savez_compressed(semantic_search_file_name, embeddings_out_round)
@@ -231,7 +229,7 @@ def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_c
 
     return results_df_out
 
-def jina_simple_retrieval(new_question_kworded:str, vectorstore, docs, orig_df_col:str, k_val:int, out_passages:int,
+def jina_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_val:int, out_passages:int,
                            vec_score_cut_off:float, vec_weight:float, in_join_file = None, in_join_column = None, search_df_join_column = None, device = torch_device, embeddings = embeddings_model, progress=gr.Progress()): # ,vectorstore, embeddings
 
     # print("vectorstore loaded: ", vectorstore)
@@ -243,7 +241,7 @@ def jina_simple_retrieval(new_question_kworded:str, vectorstore, docs, orig_df_c
     embeddings = embeddings.to(device)
 
     # Encode the query using the sentence transformer and convert to a PyTorch tensor
-    query = embeddings.encode(new_question_kworded)
+    query = embeddings.encode(query_str)
     query_tensor = tensor(query).to(device)
 
     if query_tensor.dim() == 1:
@@ -282,8 +280,10 @@ def jina_simple_retrieval(new_question_kworded:str, vectorstore, docs, orig_df_c
     # If nothing found, return error message
     if results_df_out.empty:
         return 'No result found!', None
+    
+    query_str_file = query_str.replace(" ", "_")
 
-    results_df_name = "semantic_search_result_" + today_rev + ".csv"
+    results_df_name = "semantic_search_result_" + today_rev + "_" +  query_str_file + ".csv"
     results_df_out.to_csv(results_df_name, index= None)
     results_first_text = results_df_out.iloc[0, 1]
 
@@ -394,10 +394,10 @@ def docs_to_chroma_save_deprecated(docs_out, embeddings = embeddings_model, prog
 
     return out_message, collection
 
-def chroma_retrieval_deprecated(new_question_kworded:str, vectorstore, docs, orig_df_col:str, k_val:int, out_passages:int,
+def chroma_retrieval_deprecated(query_str:str, vectorstore, docs, orig_df_col:str, k_val:int, out_passages:int,
                            vec_score_cut_off:float, vec_weight:float, in_join_file = None, in_join_column = None, search_df_join_column = None, embeddings = embeddings_model): # ,vectorstore, embeddings
 
-            query = embeddings.encode(new_question_kworded).tolist()
+            query = embeddings.encode(query_str).tolist()
 
             docs = vectorstore.query(
             query_embeddings=query,

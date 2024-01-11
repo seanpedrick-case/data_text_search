@@ -21,3 +21,4 @@ __pycache__/*
 db/*
 experiments/*
 model/*
+build_deps/*

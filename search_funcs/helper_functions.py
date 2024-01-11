@@ -97,7 +97,7 @@ def put_columns_in_df(in_file, in_bm25_column):
 
     #print(file_list)
 
-    data_file_names = [string for string in file_list if "tokenised" not in string and "embeddings" not in string]
+    data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
     data_file_name = data_file_names[0]
 
     new_choices = []

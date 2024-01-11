@@ -235,7 +235,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 
 	#print(file_list)
 
-	data_file_names = [string for string in file_list if "tokenised" not in string and "embeddings" not in string]
+	data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
 
 	data_file_name = data_file_names[0]
 
@@ -246,7 +246,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 	## Load in pre-tokenised corpus if exists
 	tokenised_df = pd.DataFrame()
 
-	tokenised_file_names = [string for string in file_list if "tokenised" in string]
+	tokenised_file_names = [string.lower() for string in file_list if "tokenised" in string.lower()]
 
 	if tokenised_file_names:
 		tokenised_df = read_file(tokenised_file_names[0])
@@ -303,7 +303,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 		message = "Data loaded. Warning: dataset may be too short to get consistent search results."
 
 	if return_intermediate_files == "Yes":
-		tokenised_data_file_name = data_file_out_name_no_ext + "_" + "keyword_search_tokenised_data.parquet"
+		tokenised_data_file_name = data_file_out_name_no_ext + "_" + "tokenised.parquet"
 		pd.DataFrame(data={"Corpus":corpus}).to_parquet(tokenised_data_file_name)
 
 		return corpus, message, df, out_file_name, tokenised_data_file_name, data_file_out_name
@@ -374,53 +374,54 @@ def convert_bm25_query_to_tokens(free_text_query, clean="No"):
 
 def bm25_search(free_text_query, in_no_search_results, original_data, text_column, clean = "No", in_join_file = None, in_join_column = "", search_df_join_column = ""):   
 
-    # Prepare query
-    if (clean == "Yes") | (text_column.endswith("_cleaned")):
-        token_query = convert_bm25_query_to_tokens(free_text_query, clean="Yes")
-    else:
-        token_query = convert_bm25_query_to_tokens(free_text_query, clean="No")
+	# Prepare query
+	if (clean == "Yes") | (text_column.endswith("_cleaned")):
+		token_query = convert_bm25_query_to_tokens(free_text_query, clean="Yes")
+	else:
+		token_query = convert_bm25_query_to_tokens(free_text_query, clean="No")
 
-    #print(token_query)
+	#print(token_query)
 
-    # Perform search
-    print("Searching")
+	# Perform search
+	print("Searching")
 
-    results_index, results_text, results_scores = bm25.extract_documents_and_scores(token_query, bm25.corpus, n=in_no_search_results) #bm25.corpus #original_data[text_column]
-    if not results_index:
-        return "No search results found", None, token_query
+	results_index, results_text, results_scores = bm25.extract_documents_and_scores(token_query, bm25.corpus, n=in_no_search_results) #bm25.corpus #original_data[text_column]
+	if not results_index:
+		return "No search results found", None, token_query
 
-    print("Search complete")
+	print("Search complete")
 
-    # Prepare results and export
-    joined_texts = [' '.join(inner_list) for inner_list in results_text]
-    results_df = pd.DataFrame(data={"index": results_index,
-                                    "search_text": joined_texts,
-                                    "search_score_abs": results_scores})
-    results_df['search_score_abs'] = abs(round(results_df['search_score_abs'], 2))
-    results_df_out = results_df[['index', 'search_text', 'search_score_abs']].merge(original_data,left_on="index", right_index=True, how="left")#.drop("index", axis=1)
-    
-    # Join on additional files
-    if in_join_file:
-        join_filename = in_join_file.name
+	# Prepare results and export
+	joined_texts = [' '.join(inner_list) for inner_list in results_text]
+	results_df = pd.DataFrame(data={"index": results_index,
+									"search_text": joined_texts,
+									"search_score_abs": results_scores})
+	results_df['search_score_abs'] = abs(round(results_df['search_score_abs'], 2))
+	results_df_out = results_df[['index', 'search_text', 'search_score_abs']].merge(original_data,left_on="index", right_index=True, how="left")#.drop("index", axis=1)
 
-        # Import data
-        join_df = read_file(join_filename)
-        join_df[in_join_column] = join_df[in_join_column].astype(str).str.replace("\.0$","", regex=True)
-        results_df_out[search_df_join_column] = results_df_out[search_df_join_column].astype(str).str.replace("\.0$","", regex=True)
+	# Join on additional files
+	if in_join_file:
+		join_filename = in_join_file.name
 
-        # Duplicates dropped so as not to expand out dataframe
-        join_df = join_df.drop_duplicates(in_join_column)
+		# Import data
+		join_df = read_file(join_filename)
+		join_df[in_join_column] = join_df[in_join_column].astype(str).str.replace("\.0$","", regex=True)
+		results_df_out[search_df_join_column] = results_df_out[search_df_join_column].astype(str).str.replace("\.0$","", regex=True)
 
-        results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left").drop(in_join_column, axis=1)
-    
-    # Reorder results by score
-    results_df_out = results_df_out.sort_values('search_score_abs', ascending=False)
+		# Duplicates dropped so as not to expand out dataframe
+		join_df = join_df.drop_duplicates(in_join_column)
 
-    # Out file
-    results_df_name = "keyword_search_result_" + today_rev + ".csv"
-    results_df_out.to_csv(results_df_name, index= None)
-    results_first_text = results_df_out[text_column].iloc[0]
+		results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left").drop(in_join_column, axis=1)
 
-    print("Returning results")
+	# Reorder results by score
+	results_df_out = results_df_out.sort_values('search_score_abs', ascending=False)
 
-    return results_first_text, results_df_name, token_query
+	# Out file
+	query_str_file = ("_").join(token_query)
+	results_df_name = "keyword_search_result_" + today_rev + "_" +  query_str_file + ".csv"
+	results_df_out.to_csv(results_df_name, index= None)
+	results_first_text = results_df_out[text_column].iloc[0]
+
+	print("Returning results")
+
+	return results_first_text, results_df_name, token_query

@@ -15,8 +15,8 @@ Search through long-form text fields in your tabular data. Either for exact, spe
 # Guide
 ## Keyword search
 
-1. Load in your tabular data file (.csv, .parquet, .xlsx - first sheet).
-2. Wait a few seconds for the file to upload, then in the dropdown menu below 'Enter the name of the text column...' choose the column from the data file that you want to search.
+1. Load in your tabular data file (.csv, .parquet, .xlsx - first sheet). If the 'Keyword search' folder has been prepared, select both of the .parquet files in this folder (both the file with and without 'tokenised' in the name) to load into the app.
+2. Wait for the file(s) to upload, then in the dropdown menu below 'Enter the name of the text column...' choose the column from the data file that you want to search.
 3. Hit 'Load data'. The 'Load progress' text box will let you know when the file is ready.
 4. In the 'Enter your search term' area below this, type in the key words you want to find in your text. Note that if the term is not spelled exactly as it is found in the text, it will not be found!
 5. Hit search text. You may have to wait depending on the size of the data you are searching.
@@ -26,8 +26,8 @@ Search through long-form text fields in your tabular data. Either for exact, spe
 
 This search type enables you to search for broader themes (e.g. happiness, nature) and the search will pick out text passages that relate to these themes even if they don't contain the exact words.
 
-1. Load in your tabular data file (.csv, .parquet, .xlsx - first sheet).
-2. Wait a few seconds for the file to upload, then in the dropdown menu below 'Enter the name of the text column...' choose the column from the data file that you want to search.
+1. Load in your tabular data file (.csv, .parquet, .xlsx - first sheet). If the 'Semantic search' folder has been prepared, select both of the .files in this folder to load into the app. This should be a '..prepared_docs.pkl.gz' file, and a '...embeddings_compress.npz' or 'embeddings.npz' file.
+2. Wait for the file(s) to upload, then in the dropdown menu below 'Enter the name of the text column...' choose the column from the data file that you want to search. If the 'Semantic search' folder has been prepared, this field should be 'page_contents'.
 3. Hit 'Load data'. The 'Load progress' text box will let you know when the file is ready.
 4. In the 'Enter semantic search query here' area below this, type in the terms you would like to search for.
 5. Press 'Start semantic search'. You may have to wait depending on the size of the data you are searching.

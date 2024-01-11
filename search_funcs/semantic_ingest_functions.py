@@ -130,7 +130,7 @@ def parse_csv_or_excel(file_path, data_state, text_column = "text"):
 
         #print(file_list)
 
-        data_file_names = [string for string in file_list if "tokenised" not in string and "embeddings" not in string]
+        data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
         
         data_file_name = data_file_names[0]
         
@@ -299,7 +299,7 @@ def csv_excel_text_to_docs(df, in_file, text_column='text', clean = "No", return
     
     file_list = [string.name for string in in_file]
 
-    data_file_names = [string for string in file_list if "tokenised" not in string and "embeddings" not in string]
+    data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
     data_file_name = data_file_names[0]
 
     # Check if file is a document format, and explode out as needed
@@ -312,7 +312,7 @@ def csv_excel_text_to_docs(df, in_file, text_column='text', clean = "No", return
 
         doc_sections = df
 
-        print(doc_sections[0])
+        #print(doc_sections[0])
 
         # Convert each element in the Series to a Document instance
         #doc_sections = section_series.apply(lambda x: Document(**x))
@@ -365,7 +365,7 @@ def csv_excel_text_to_docs(df, in_file, text_column='text', clean = "No", return
 
     if return_intermediate_files == "Yes":
         data_file_out_name_no_ext = get_file_path_end(data_file_name)
-        file_name = data_file_out_name_no_ext + "_cleaned"
+        file_name = data_file_out_name_no_ext
         #print(doc_sections)
         #page_content_series_string = pd.Series(doc_sections).astype(str)
         #page_content_series_string = page_content_series_string.str.replace(" type='Document'", "").str.replace("' metadata=", "', 'metadata':").str.replace("page_content=", "{'page_content':")
