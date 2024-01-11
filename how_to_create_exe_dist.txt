@@ -17,10 +17,10 @@ NOTE: for ensuring that spaCy models are loaded into the program correctly in re
 8. In command line, cd to the folder that contains app.py. Then run the following:
 
 For one single file:
-python -m PyInstaller --additional-hooks-dir=. --hidden-import pyarrow.vendored.version --add-data="types.json;gradio_client" --add-data "model;model" --onefile --clean --noconfirm --upx-dir="C:\Program Files\UPX\upx-4.2.2-win64" --name DataSearchApp_0.1 app.py
+python -m PyInstaller --additional-hooks-dir=. --hidden-import pyarrow.vendored.version --add-data="types.json;gradio_client" --add-data "model;model" --onefile --clean --noconfirm --name DataSearchApp_0.1 app.py
 
 For a small exe with a folder of dependencies:
-python -m PyInstaller --additional-hooks-dir=. --hidden-import pyarrow.vendored.version --add-data="types.json;gradio_client" --add-data "model;model" --clean --noconfirm --upx-dir="C:\Program Files\UPX\upx-4.2.2-win64" --name DataSearchApp_0.1 app.py
+python -m PyInstaller --additional-hooks-dir=. --hidden-import pyarrow.vendored.version --add-data="types.json;gradio_client" --add-data "model;model" --clean --noconfirm --name DataSearchApp_0.1 app.py
 
 9. A 'dist' folder will be created with the executable inside along with all dependencies('dist\data_text_search'). 
 
