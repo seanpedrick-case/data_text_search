@@ -96,10 +96,10 @@ def docs_to_jina_embed_np_array(docs_out, in_file, return_intermediate_files = "
     ## Load in pre-embedded file if exists
     file_list = [string.name for string in in_file]
 
-    print(file_list)
+    #print(file_list)
 
-    embeddings_file_names = [string.lower() for string in file_list if "npz" in string.lower()]
-    data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
+    embeddings_file_names = [string.lower() for string in file_list if "embedding" in string.lower()]
+    data_file_names = [string.lower() for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower()]# and "gz" not in string.lower()]
     data_file_name = data_file_names[0]
     data_file_name_no_ext = get_file_path_end(data_file_name)
 
@@ -283,8 +283,8 @@ def jina_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_v
     
     query_str_file = query_str.replace(" ", "_")
 
-    results_df_name = "semantic_search_result_" + today_rev + "_" +  query_str_file + ".csv"
-    results_df_out.to_csv(results_df_name, index= None)
+    results_df_name = "semantic_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
+    results_df_out.to_excel(results_df_name, index= None)
     results_first_text = results_df_out.iloc[0, 1]
 
     return results_first_text, results_df_name

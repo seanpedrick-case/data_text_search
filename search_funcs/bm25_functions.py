@@ -3,8 +3,10 @@ import heapq
 import math
 import pickle
 import sys
+import gzip
 import time
 import pandas as pd
+import numpy as np
 from numpy import inf
 import gradio as gr
 
@@ -235,7 +237,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 
 	#print(file_list)
 
-	data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
+	data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower() and "gz" not in string.lower()]
 
 	data_file_name = data_file_names[0]
 
@@ -247,20 +249,24 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 	tokenised_df = pd.DataFrame()
 
 	tokenised_file_names = [string.lower() for string in file_list if "tokenised" in string.lower()]
+	search_index_file_names = [string.lower() for string in file_list if "gz" in string.lower()]
+
+	df[text_column] = df[text_column].astype(str).str.lower()
+
+	if search_index_file_names:
+		corpus = list(df[text_column])
+		message = "Tokenisation skipped - loading search index from file."
+		print(message)
+		return corpus, message, df, None, None, None
 
 	if tokenised_file_names:
 		tokenised_df = read_file(tokenised_file_names[0])
-		#print("Tokenised df is: ", tokenised_df.head())
-
-	#df = pd.read_parquet(file_in.name)
-	
-	df[text_column] = df[text_column].astype(str).str.lower()
 	
 	if clean == "Yes":
 		clean_tic = time.perf_counter()
 		print("Starting data clean.")
 
-		df = df.drop_duplicates(text_column)
+		#df = df.drop_duplicates(text_column)
 		df_list = list(df[text_column])
 		df_list = initial_clean(df_list)
 
@@ -336,20 +342,62 @@ def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_col
 
 	return file_name, new_text_column
 
-def prepare_bm25(corpus, k1=1.5, b = 0.75, alpha=-5):
-    #bm25.save("saved_df_bm25")
-    #bm25 = BM25.load(re.sub(r'\.pkl$', '', file_in.name))
+def prepare_bm25(corpus, in_file, return_intermediate_files, k1=1.5, b = 0.75, alpha=-5):
+	#bm25.save("saved_df_bm25")
+	#bm25 = BM25.load(re.sub(r'\.pkl$', '', file_in.name))
 
-    print("Preparing BM25 corpus")
+	file_list = [string.name for string in in_file]
 
-    global bm25
-    bm25 = BM25(corpus, k1=k1, b=b, alpha=alpha)
+	#print(file_list)
 
-    message = "Search parameters loaded."
+	# Get data file name
+	data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower() and "gz" not in string.lower()]
 
-    print(message)
+	data_file_name = data_file_names[0]
+	data_file_out_name = get_file_path_end_with_ext(data_file_name)
+	data_file_name_no_ext = get_file_path_end(data_file_name)
 
-    return message
+	# Check if there is a search index file already
+	index_file_names = [string.lower() for string in file_list if "gz" in string.lower()]
+
+
+	if index_file_names:
+		index_file_name = index_file_names[0]
+
+		print(index_file_name)
+
+		bm25_load = read_file(index_file_name)
+		
+
+		#index_file_out_name = get_file_path_end_with_ext(index_file_name)
+		#index_file_name_no_ext = get_file_path_end(index_file_name)
+
+	else:
+		print("Preparing BM25 corpus")
+
+		bm25_load = BM25(corpus, k1=k1, b=b, alpha=alpha)
+
+	global bm25
+	bm25 = bm25_load
+
+	if return_intermediate_files == "Yes":
+		bm25_search_file_name = data_file_name_no_ext + '_' + 'search_index.pkl.gz'
+		#np.savez_compressed(bm25_search_file_name, bm25)
+
+		with gzip.open(bm25_search_file_name, 'wb') as file:
+				pickle.dump(bm25, file)
+
+		print("Search index saved to file")
+
+		message = "Search parameters loaded."
+
+		return message, bm25_search_file_name
+
+	message = "Search parameters loaded."
+
+	print(message)
+
+	return message, None
 
 def convert_bm25_query_to_tokens(free_text_query, clean="No"):
     '''
@@ -418,8 +466,8 @@ def bm25_search(free_text_query, in_no_search_results, original_data, text_colum
 
 	# Out file
 	query_str_file = ("_").join(token_query)
-	results_df_name = "keyword_search_result_" + today_rev + "_" +  query_str_file + ".csv"
-	results_df_out.to_csv(results_df_name, index= None)
+	results_df_name = "keyword_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
+	results_df_out.to_excel(results_df_name, index= None)
 	results_first_text = results_df_out[text_column].iloc[0]
 
 	print("Returning results")

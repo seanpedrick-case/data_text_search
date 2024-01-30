@@ -15,7 +15,7 @@ Search through long-form text fields in your tabular data. Either for exact, spe
 # Guide
 ## Keyword search
 
-1. Load in your tabular data file (.csv, .parquet, .xlsx - first sheet). If the 'Keyword search' folder has been prepared, select both of the .parquet files in this folder (both the file with and without 'tokenised' in the name) to load into the app.
+1. Load in your tabular data file (.csv, .parquet, .xlsx - first sheet). If the 'Keyword search' folder has been prepared, select both of the .files in this folder (both the data file and the file ending 'search_index.pkl.gz') to load into the app.
 2. Wait for the file(s) to upload, then in the dropdown menu below 'Enter the name of the text column...' choose the column from the data file that you want to search.
 3. Hit 'Load data'. The 'Load progress' text box will let you know when the file is ready.
 4. In the 'Enter your search term' area below this, type in the key words you want to find in your text. Note that if the term is not spelled exactly as it is found in the text, it will not be found!

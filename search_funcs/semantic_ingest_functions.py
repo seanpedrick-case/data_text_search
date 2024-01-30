@@ -130,7 +130,7 @@ def parse_csv_or_excel(file_path, data_state, text_column = "text"):
 
         #print(file_list)
 
-        data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
+        data_file_names = [string.lower() for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower()]# and "gz" not in string.lower()]
         
         data_file_name = data_file_names[0]
         
@@ -329,7 +329,7 @@ def csv_excel_text_to_docs(df, in_file, text_column='text', clean = "No", return
         clean_tic = time.perf_counter()
         print("Starting data clean.")
         
-        df = df.drop_duplicates(text_column)
+        #df = df.drop_duplicates(text_column)
         
         df[text_column] = initial_clean(df[text_column])
         df_list = list(df[text_column])

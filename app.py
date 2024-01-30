@@ -28,12 +28,13 @@ with block:
     out_passages = gr.State(9999)
     vec_weight = gr.State(1)
 
-    docs_keep_as_doc_state = gr.State()
-    doc_df_state = gr.State()
-    docs_keep_out_state = gr.State()
+    #docs_keep_as_doc_state = gr.State()
+    #doc_df_state = gr.State()
+    #docs_keep_out_state = gr.State()
 
     corpus_state = gr.State()
-    data_state = gr.State(pd.DataFrame())
+    keyword_data_state = gr.State(pd.DataFrame())
+    semantic_data_state = gr.State(pd.DataFrame())
 
     in_k1_info = gr.State("""k1: Constant used for influencing the term frequency saturation. After saturation is reached, additional
 presence for the term adds a significantly less additional score. According to [1]_, experiments suggest
@@ -58,13 +59,13 @@ depends on factors such as the type of documents or queries. Information taken f
     """
     **Exact term keyword search**
     
-    1. Load in data file (ideally a file with '_cleaned' at the end of the name), with (optionally) the '...tokenised.parquet' in the same folder to save loading time. 2. Select the field in your data to search. A field with the suffix '_cleaned' means that html tags have been removed. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the relevant box below and press Enter/click on 'Search text'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
+    1. Load in data file (ideally a file with '_cleaned' at the end of the name), with (optionally) the '...search_index.pkl.gz' in the same folder to save loading time. 2. Select the field in your data to search. A field with the suffix '_cleaned' means that html tags have been removed. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the relevant box below and press Enter/click on 'Search text'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
     """)
         with gr.Row():
             current_source = gr.Textbox(label="Current data source(s)", value="None")
 
         with gr.Accordion(label = "Load in data", open=True):
-            in_bm25_file = gr.File(label="Upload data for keyword search", file_count= 'multiple', file_types = ['.parquet', '.csv'])
+            in_bm25_file = gr.File(label="Upload data for keyword search", file_count= 'multiple', file_types =['.parquet', '.csv', '.pkl', '.pkl.gz'])
             with gr.Row():
                 in_bm25_column = gr.Dropdown(label="Enter the name of the text column in the data file to search") 
                 load_bm25_data_button = gr.Button(value="Load data")
@@ -148,22 +149,22 @@ depends on factors such as the type of documents or queries. Information taken f
     
     ### BM25 SEARCH ###
     # Update dropdowns upon initial file load
-    in_bm25_file.upload(put_columns_in_df, inputs=[in_bm25_file, in_bm25_column], outputs=[in_bm25_column, in_clean_data, search_df_join_column, data_state])
+    in_bm25_file.upload(put_columns_in_df, inputs=[in_bm25_file, in_bm25_column], outputs=[in_bm25_column, in_clean_data, search_df_join_column, keyword_data_state])
     in_join_file.upload(put_columns_in_join_df, inputs=[in_join_file, in_join_column], outputs=[in_join_column])
  
     # Load in BM25 data
-    load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, data_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, data_state, output_file, output_file, current_source]).\
-    then(fn=prepare_bm25, inputs=[corpus_state, in_k1, in_b, in_alpha], outputs=[load_finished_message])#.\
+    load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, keyword_data_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, keyword_data_state, output_file, output_file, current_source]).\
+    then(fn=prepare_bm25, inputs=[corpus_state, in_bm25_file, return_intermediate_files, in_k1, in_b, in_alpha], outputs=[load_finished_message, output_file])#.\
     #then(fn=put_columns_in_df, inputs=[in_bm25_file, in_bm25_column], outputs=[in_bm25_column, in_clean_data, search_df_join_column])
    
     # BM25 search functions on click or enter
-    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword")
-    keyword_query.submit(fn=bm25_search, inputs=[keyword_query, in_no_search_results, data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file])
+    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, keyword_data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword")
+    keyword_query.submit(fn=bm25_search, inputs=[keyword_query, in_no_search_results, keyword_data_state, in_bm25_column, in_clean_data, in_join_file, in_join_column, search_df_join_column], outputs=[output_single_text, output_file])
     
     ### SEMANTIC SEARCH ###
     # Load in a csv/excel file for semantic search
-    in_semantic_file.upload(put_columns_in_df, inputs=[in_semantic_file, in_semantic_column], outputs=[in_semantic_column, in_clean_data, search_df_join_column, data_state])
-    load_semantic_data_button.click(parse_csv_or_excel, inputs=[in_semantic_file, data_state, in_semantic_column], outputs=[ingest_text, current_source_semantic, semantic_load_progress]).\
+    in_semantic_file.upload(put_columns_in_df, inputs=[in_semantic_file, in_semantic_column], outputs=[in_semantic_column, in_clean_data, search_df_join_column, semantic_data_state])
+    load_semantic_data_button.click(parse_csv_or_excel, inputs=[in_semantic_file, semantic_data_state, in_semantic_column], outputs=[ingest_text, current_source_semantic, semantic_load_progress]).\
              then(csv_excel_text_to_docs, inputs=[ingest_text, in_semantic_file, in_semantic_column, in_clean_data, return_intermediate_files], outputs=[ingest_docs, semantic_load_progress]).\
              then(docs_to_jina_embed_np_array, inputs=[ingest_docs, in_semantic_file, return_intermediate_files, embedding_super_compress], outputs=[semantic_load_progress, vectorstore_state, semantic_output_file])
     

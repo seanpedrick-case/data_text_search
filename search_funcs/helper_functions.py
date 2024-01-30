@@ -2,10 +2,6 @@ import os
 import re
 import pandas as pd
 import gradio as gr
-
-import os
-import shutil
-
 import os
 import shutil
 import getpass
@@ -32,7 +28,6 @@ def empty_folder(directory_path):
         except Exception as e:
             #print(f'Failed to delete {file_path}. Reason: {e}')
             print('')
-
 
 
 
@@ -64,6 +59,8 @@ def detect_file_type(filename):
         return 'parquet'
     elif filename.endswith('.pkl.gz'):
         return 'pkl.gz'
+    #elif filename.endswith('.gz'):
+    #    return 'gz'
     else:
         raise ValueError("Unsupported file type.")
 
@@ -82,7 +79,9 @@ def read_file(filename):
     elif file_type == 'pkl.gz':
         with gzip.open(filename, 'rb') as file:
             file = pickle.load(file)
-            #file = pd.read_pickle(filename)
+    #elif file_type == ".gz":
+    #    with gzip.open(filename, 'rb') as file:
+    #        file = pickle.load(file)
 
     print("File load complete")
 
