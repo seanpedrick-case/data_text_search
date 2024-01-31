@@ -18,7 +18,7 @@ from search_funcs.clean_funcs import initial_clean # get_lemma_tokens, stem_sent
 from search_funcs.helper_functions import read_file, get_file_path_end_with_ext, get_file_path_end
 
 # Load the SpaCy model
-from spacy.cli import download
+from spacy.cli.download import download
 import spacy
 spacy.prefer_gpu()
 
@@ -231,13 +231,25 @@ class BM25:
 
 # These following functions are my own work
 
-def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  return_intermediate_files = "No", progress=gr.Progress()):
+def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  return_intermediate_files = "No", progress=gr.Progress(track_tqdm=True)):
+	print(in_file)
 
+	if not in_file:
+		print("No input file found. Please load in at least one file.")
+		return None, "No input file found. Please load in at least one file.", data_state, None, None, None
+
+	progress(0, desc = "Loading in data")
 	file_list = [string.name for string in in_file]
 
 	#print(file_list)
 
-	data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower() and "gz" not in string.lower()]
+	data_file_names = [string.lower() for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "gz" not in string.lower()]
+
+	if not data_file_names:
+		return None, "Please load in at least one csv/Excel/parquet data file.", data_state, None, None, None
+
+	if not text_column:
+		return None, "Please enter a column name to search.", data_state, None, None, None
 
 	data_file_name = data_file_names[0]
 
@@ -263,6 +275,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 		tokenised_df = read_file(tokenised_file_names[0])
 	
 	if clean == "Yes":
+		progress(0.1, desc = "Cleaning data")
 		clean_tic = time.perf_counter()
 		print("Starting data clean.")
 
@@ -280,14 +293,16 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 	else:
 		# Don't clean or save file to disk
 		df_list = list(df[text_column])
-		print("No data cleaning performed.")
+		print("No data cleaning performed")
 		out_file_name = None
 		
 	# Tokenise data. If tokenised df already exists, no need to do anything
 	
+	progress(0.4, desc = "Tokenising text")
+
 	if not tokenised_df.empty:
 		corpus = tokenised_df.iloc[:,0].tolist()
-		print("Tokeniser loaded from file.")
+		print("Tokeniser loaded from file")
 		#print("Corpus is: ", corpus[0:5])
 
 	# If doesn't already exist, tokenize texts in batches
@@ -316,7 +331,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 
 	return corpus, message, df, out_file_name, None, data_file_out_name # tokenised_data_file_name
 
-def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_column):
+def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_column, progress=gr.Progress(track_tqdm=True)):
 
 	# Check if the list and the dataframe have the same length
 	if len(prepared_text_list) != len(in_df):
@@ -342,31 +357,55 @@ def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_col
 
 	return file_name, new_text_column
 
-def prepare_bm25(corpus, in_file, return_intermediate_files, k1=1.5, b = 0.75, alpha=-5):
+def prepare_bm25(corpus, in_file, text_column, search_index, return_intermediate_files, k1=1.5, b = 0.75, alpha=-5, progress=gr.Progress(track_tqdm=True)):
 	#bm25.save("saved_df_bm25")
 	#bm25 = BM25.load(re.sub(r'\.pkl$', '', file_in.name))
+
+	
+
+	if not in_file:
+		out_message ="No input file found. Please load in at least one file."
+		print(out_message)
+		return out_message, None
+
+	if not corpus:
+		out_message = "No data file found. Please load in at least one csv/Excel/Parquet file."
+		print(out_message)
+		return out_message, None
+
+	if not text_column:
+		out_message = "Please enter a column name to search."
+		print(out_message)
+		return  out_message, None
+
+
 
 	file_list = [string.name for string in in_file]
 
 	#print(file_list)
 
 	# Get data file name
-	data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower() and "gz" not in string.lower()]
+	data_file_names = [string.lower() for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "gz" not in string.lower()]
+
+	if not data_file_names:
+		return "Please load in at least one csv/Excel/parquet data file.", None
 
 	data_file_name = data_file_names[0]
 	data_file_out_name = get_file_path_end_with_ext(data_file_name)
 	data_file_name_no_ext = get_file_path_end(data_file_name)
 
 	# Check if there is a search index file already
-	index_file_names = [string.lower() for string in file_list if "gz" in string.lower()]
+	#index_file_names = [string.lower() for string in file_list if "gz" in string.lower()]
 
+	progress(0.6, desc = "Preparing search index")
 
-	if index_file_names:
-		index_file_name = index_file_names[0]
+	#if index_file_names:
+	if search_index:
+		#index_file_name = index_file_names[0]
 
-		print(index_file_name)
+		#print(index_file_name)
 
-		bm25_load = read_file(index_file_name)
+		bm25_load = search_index
 		
 
 		#index_file_out_name = get_file_path_end_with_ext(index_file_name)
@@ -381,6 +420,8 @@ def prepare_bm25(corpus, in_file, return_intermediate_files, k1=1.5, b = 0.75, a
 	bm25 = bm25_load
 
 	if return_intermediate_files == "Yes":
+		print("Saving search index file")
+		progress(0.8, desc = "Saving search index to file")
 		bm25_search_file_name = data_file_name_no_ext + '_' + 'search_index.pkl.gz'
 		#np.savez_compressed(bm25_search_file_name, bm25)
 
@@ -420,8 +461,10 @@ def convert_bm25_query_to_tokens(free_text_query, clean="No"):
 
     return out_query
 
-def bm25_search(free_text_query, in_no_search_results, original_data, text_column, clean = "No", in_join_file = None, in_join_column = "", search_df_join_column = ""):   
+def bm25_search(free_text_query, in_no_search_results, original_data, text_column, in_join_file, clean = "No",  in_join_column = "", search_df_join_column = "", progress=gr.Progress(track_tqdm=True)):   
 
+	progress(0, desc = "Conducting keyword search")
+	
 	# Prepare query
 	if (clean == "Yes") | (text_column.endswith("_cleaned")):
 		token_query = convert_bm25_query_to_tokens(free_text_query, clean="Yes")
@@ -435,7 +478,7 @@ def bm25_search(free_text_query, in_no_search_results, original_data, text_colum
 
 	results_index, results_text, results_scores = bm25.extract_documents_and_scores(token_query, bm25.corpus, n=in_no_search_results) #bm25.corpus #original_data[text_column]
 	if not results_index:
-		return "No search results found", None, token_query
+		return "No search results found", None
 
 	print("Search complete")
 
@@ -448,18 +491,16 @@ def bm25_search(free_text_query, in_no_search_results, original_data, text_colum
 	results_df_out = results_df[['index', 'search_text', 'search_score_abs']].merge(original_data,left_on="index", right_index=True, how="left")#.drop("index", axis=1)
 
 	# Join on additional files
-	if in_join_file:
-		join_filename = in_join_file.name
-
-		# Import data
-		join_df = read_file(join_filename)
+	if not in_join_file.empty:
+		progress(0.5, desc = "Joining on additional data file")
+		join_df = in_join_file
 		join_df[in_join_column] = join_df[in_join_column].astype(str).str.replace("\.0$","", regex=True)
 		results_df_out[search_df_join_column] = results_df_out[search_df_join_column].astype(str).str.replace("\.0$","", regex=True)
 
 		# Duplicates dropped so as not to expand out dataframe
 		join_df = join_df.drop_duplicates(in_join_column)
 
-		results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left").drop(in_join_column, axis=1)
+		results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left")#.drop(in_join_column, axis=1)
 
 	# Reorder results by score
 	results_df_out = results_df_out.sort_values('search_score_abs', ascending=False)
@@ -467,9 +508,13 @@ def bm25_search(free_text_query, in_no_search_results, original_data, text_colum
 	# Out file
 	query_str_file = ("_").join(token_query)
 	results_df_name = "keyword_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
+
+	print("Saving search file output")
+	progress(0.7, desc = "Saving search output to file")
+
 	results_df_out.to_excel(results_df_name, index= None)
 	results_first_text = results_df_out[text_column].iloc[0]
 
 	print("Returning results")
 
-	return results_first_text, results_df_name, token_query
+	return results_first_text, results_df_name

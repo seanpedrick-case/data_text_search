@@ -12,7 +12,6 @@ today_rev = datetime.now().strftime("%Y%m%d")
 from transformers import AutoModel
 
 from torch import cuda, backends, tensor, mm
-from search_funcs.helper_functions import read_file
 
 # Check for torch cuda
 print("Is CUDA enabled? ", cuda.is_available())
@@ -43,18 +42,6 @@ except:
     embeddings_model = AutoModel.from_pretrained(embeddings_name, revision = revision_choice, trust_remote_code=True, device_map="auto")
 
 
-# Chroma support is currently deprecated
-# Import Chroma and instantiate a client. The default Chroma client is ephemeral, meaning it will not save to disk.
-#import chromadb
-#from chromadb.config import Settings
-#from typing_extensions import Protocol
-#from chromadb import Documents, EmbeddingFunction, Embeddings
-
-# Remove Chroma database file. If it exists as it can cause issues
-#chromadb_file = "chroma.sqlite3"
-
-#if os.path.isfile(chromadb_file):
-#    os.remove(chromadb_file)
 def get_file_path_end(file_path):
     # First, get the basename of the file (e.g., "example.txt" from "/path/to/example.txt")
     basename = os.path.basename(file_path)
@@ -82,10 +69,17 @@ def load_embeddings(embeddings_name = embeddings_name):
 
     return embeddings
 
-def docs_to_jina_embed_np_array(docs_out, in_file, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings = embeddings_model, progress=gr.Progress()):
+def docs_to_jina_embed_np_array(docs_out, in_file, embeddings_state, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings = embeddings_model, progress=gr.Progress(track_tqdm=True)):
     '''
     Takes a Langchain document class and saves it into a Chroma sqlite file.
     '''
+    if not in_file:
+        out_message = "No input file found. Please load in at least one file."
+        print(out_message)
+        return out_message, None, None
+        
+
+    progress(0.7, desc = "Loading/creating embeddings")
 
     print(f"> Total split documents: {len(docs_out)}")
 
@@ -105,17 +99,9 @@ def docs_to_jina_embed_np_array(docs_out, in_file, return_intermediate_files = "
 
     out_message = "Document processing complete. Ready to search."
 
-    if embeddings_file_names:
-        print("Loading embeddings from file.")
-        embeddings_out = np.load(embeddings_file_names[0])['arr_0']
+     # print("embeddings loaded: ", embeddings_out)
 
-        # If embedding files have 'super_compress' in the title, they have been multiplied by 100 before save
-        if "compress" in embeddings_file_names[0]:
-            embeddings_out /= 100
-
-        # print("embeddings loaded: ", embeddings_out)
-
-    if not embeddings_file_names:
+    if embeddings_state.size == 0:
         tic = time.perf_counter()
         print("Starting to embed documents.")
         #embeddings_list = []
@@ -132,6 +118,7 @@ def docs_to_jina_embed_np_array(docs_out, in_file, return_intermediate_files = "
 
         # If you want to save your files for next time
         if return_intermediate_files == "Yes":
+            progress(0.9, desc = "Saving embeddings to file")
             if embeddings_super_compress == "No":
                 semantic_search_file_name = data_file_name_no_ext + '_' + 'embeddings.npz'
                 np.savez_compressed(semantic_search_file_name, embeddings_out)
@@ -144,12 +131,15 @@ def docs_to_jina_embed_np_array(docs_out, in_file, return_intermediate_files = "
             return out_message, embeddings_out, semantic_search_file_name
 
         return out_message, embeddings_out, None
+    else:
+        # Just return existing embeddings if already exist
+        embeddings_out = embeddings_state
     
     print(out_message)
 
     return out_message, embeddings_out, None#, None
 
-def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_cut_off, vec_weight, orig_df_col, in_join_column, search_df_join_column):
+def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_cut_off, vec_weight, orig_df_col, in_join_column, search_df_join_column, progress = gr.Progress(track_tqdm=True)):
 
     def create_docs_keep_from_df(df):
         dict_out = {'ids' : [df['ids']],
@@ -213,11 +203,10 @@ def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_c
     # results_df_out = orig_df.merge(length_more_limit[['ids', 'distances']], left_index = True, right_on = "ids", how="inner").sort_values("distances")
 
     # Join on additional files
-    if in_join_file:
-        join_filename = in_join_file.name
+    if not in_join_file.empty:
+        progress(0.5, desc = "Joining on additional data file")
+        join_df = in_join_file
 
-        # Import data
-        join_df = read_file(join_filename)
         join_df[in_join_column] = join_df[in_join_column].astype(str).str.replace("\.0$","", regex=True)
 
         # Duplicates dropped so as not to expand out dataframe
@@ -225,14 +214,17 @@ def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_c
 
         results_df_out[search_df_join_column] = results_df_out[search_df_join_column].astype(str).str.replace("\.0$","", regex=True)
 
-        results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left").drop(in_join_column, axis=1)
+        results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left")#.drop(in_join_column, axis=1)
 
     return results_df_out
 
 def jina_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_val:int, out_passages:int,
-                           vec_score_cut_off:float, vec_weight:float, in_join_file = None, in_join_column = None, search_df_join_column = None, device = torch_device, embeddings = embeddings_model, progress=gr.Progress()): # ,vectorstore, embeddings
+                           vec_score_cut_off:float, vec_weight:float, in_join_file, in_join_column = None, search_df_join_column = None, device = torch_device, embeddings = embeddings_model, progress=gr.Progress(track_tqdm=True)): # ,vectorstore, embeddings
 
     # print("vectorstore loaded: ", vectorstore)
+    progress(0, desc = "Conducting semantic search")
+
+    print("Searching")
 
     # Convert it to a PyTorch tensor and transfer to GPU
     vectorstore_tensor = tensor(vectorstore).to(device)
@@ -277,6 +269,8 @@ def jina_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_v
     
     results_df_out = process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_cut_off, vec_weight, orig_df_col, in_join_column, search_df_join_column)
 
+    print("Search complete")
+
     # If nothing found, return error message
     if results_df_out.empty:
         return 'No result found!', None
@@ -284,12 +278,30 @@ def jina_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_v
     query_str_file = query_str.replace(" ", "_")
 
     results_df_name = "semantic_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
+
+    print("Saving search output to file")
+    progress(0.7, desc = "Saving search output to file")
+
     results_df_out.to_excel(results_df_name, index= None)
     results_first_text = results_df_out.iloc[0, 1]
+
+    print("Returning results")
 
     return results_first_text, results_df_name
 
 # Deprecated Chroma functions - kept just in case needed in future.
+# Chroma support is currently deprecated
+# Import Chroma and instantiate a client. The default Chroma client is ephemeral, meaning it will not save to disk.
+#import chromadb
+#from chromadb.config import Settings
+#from typing_extensions import Protocol
+#from chromadb import Documents, EmbeddingFunction, Embeddings
+
+# Remove Chroma database file. If it exists as it can cause issues
+#chromadb_file = "chroma.sqlite3"
+
+#if os.path.isfile(chromadb_file):
+#    os.remove(chromadb_file)
 
 def docs_to_chroma_save_deprecated(docs_out, embeddings = embeddings_model, progress=gr.Progress()):
     '''

@@ -294,12 +294,23 @@ def parse_metadata(row):
 
 #     return doc_sections, message
 
-def csv_excel_text_to_docs(df, in_file, text_column='text', clean = "No", return_intermediate_files = "No", chunk_size=None, progress=gr.Progress()) -> List[Document]:
+def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_intermediate_files = "No", chunk_size=None, progress=gr.Progress(track_tqdm=True)) -> List[Document]:
     """Converts a DataFrame's content to a list of dictionaries in the 'Document' format, containing page_content and associated metadata."""
+    if not in_file:
+        return None, "Please load in at least one file.", data_state, None, None, None
+
+    progress(0, desc = "Loading in data")
     
     file_list = [string.name for string in in_file]
 
     data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
+
+    if not data_file_names:
+        return doc_sections, "Please load in at least one csv/Excel/parquet data file."
+
+    if not text_column:
+        return None, "Please enter a column name to search", data_state, None, None, None
+
     data_file_name = data_file_names[0]
 
     # Check if file is a document format, and explode out as needed
@@ -326,6 +337,7 @@ def csv_excel_text_to_docs(df, in_file, text_column='text', clean = "No", return
     df[text_column] = df[text_column].astype(str).str.strip() # Ensure column is a string column
 
     if clean == "Yes":
+        progress(0.1, desc = "Cleaning data")
         clean_tic = time.perf_counter()
         print("Starting data clean.")
         
@@ -352,6 +364,7 @@ def csv_excel_text_to_docs(df, in_file, text_column='text', clean = "No", return
     #doc_sections = df[["page_content", "metadata"]].to_dict(orient='records')
     #doc_sections = [Document(**row) for row in df[["page_content", "metadata"]].to_dict(orient='records')]
 
+    progress(0.3, desc = "Converting data to document format")
 
     # Create a list of Document objects
     doc_sections = [Document(page_content=row['page_content'], 
@@ -364,6 +377,7 @@ def csv_excel_text_to_docs(df, in_file, text_column='text', clean = "No", return
     print(ingest_time_out)
 
     if return_intermediate_files == "Yes":
+        progress(0.5, desc = "Saving prepared documents")
         data_file_out_name_no_ext = get_file_path_end(data_file_name)
         file_name = data_file_out_name_no_ext
         #print(doc_sections)

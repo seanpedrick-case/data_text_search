@@ -7,6 +7,7 @@ import shutil
 import getpass
 import gzip
 import pickle
+import numpy as np
 
 # Attempt to delete content of gradio temp folder
 def get_temp_folder_path():
@@ -89,19 +90,27 @@ def read_file(filename):
 
 def put_columns_in_df(in_file, in_bm25_column):
     '''
-    When file is loaded, update the column dropdown choices and change 'clean data' dropdown option to 'no'.
+    When file is loaded, update the column dropdown choices
     '''
+    new_choices = []
+    concat_choices = []
+    index_load = None
+    embed_load = np.array([])
+    out_message = ""
 
     file_list = [string.name for string in in_file]
 
     #print(file_list)
 
-    data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
-    data_file_name = data_file_names[0]
+    data_file_names = [string.lower() for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "search_index" not in string.lower()]
 
-    new_choices = []
-    concat_choices = []
-    
+    if not data_file_names:
+        out_message = "Please load in at least one csv/Excel/parquet data file."
+        print(out_message)
+        return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), bm25_load, out_message
+
+    data_file_name = data_file_names[0]
+   
     
     df = read_file(data_file_name)
 
@@ -109,32 +118,60 @@ def put_columns_in_df(in_file, in_bm25_column):
 
         new_choices = list(df.columns)
 
+    elif "search_index" in data_file_name:
+        # If only the search_index found, need a data file too
+        new_choices = []
+
     else: new_choices = ["page_contents"] + list(df[0].metadata.keys()) #["Documents"]
     #print(new_choices)
 
-    concat_choices.extend(new_choices)     
+    concat_choices.extend(new_choices)
+
+    # Check if there is a search index file already
+    index_file_names = [string.lower() for string in file_list if "gz" in string.lower()]
+
+    if index_file_names:
+        index_file_name = index_file_names[0]
+        index_load = read_file(index_file_name)
+
+    embeddings_file_names = [string.lower() for string in file_list if "embedding" in string.lower()]
+
+    if embeddings_file_names:
+        print("Loading embeddings from file.")
+        embed_load = np.load(embeddings_file_names[0])['arr_0']
+
+        # If embedding files have 'super_compress' in the title, they have been multiplied by 100 before save
+        if "compress" in embeddings_file_names[0]:
+            embed_load /= 100
+    else:
+        embed_load = np.array([])
+
+    out_message = "Initial data check successful. Next, choose a data column to search in the drop down above, then click 'Load data'"
+    print(out_message)
         
-    return gr.Dropdown(choices=concat_choices), gr.Dropdown(value="No", choices = ["Yes", "No"]), gr.Dropdown(choices=concat_choices), df
+    return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), df, index_load, embed_load, out_message
 
-def put_columns_in_join_df(in_file, in_bm25_column):
+def put_columns_in_join_df(in_file):
     '''
-    When file is loaded, update the column dropdown choices and change 'clean data' dropdown option to 'no'.
+    When file is loaded, update the column dropdown choices
     '''
-
-    print("in_bm25_column")
+    new_df = pd.DataFrame()
+    #print("in_bm25_column")
 
     new_choices = []
     concat_choices = []
     
     
-    df = read_file(in_file.name)
-    new_choices = list(df.columns)
+    new_df = read_file(in_file.name)
+    new_choices = list(new_df.columns)
 
-    print(new_choices)
+    #print(new_choices)
 
-    concat_choices.extend(new_choices)     
+    concat_choices.extend(new_choices)
+
+    out_message = "File load successful. Now select a column to join below."    
         
-    return gr.Dropdown(choices=concat_choices)
+    return gr.Dropdown(choices=concat_choices), new_df, out_message
 
 def dummy_function(gradio_component):
     """
