@@ -88,7 +88,7 @@ def read_file(filename):
 
     return file
 
-def put_columns_in_df(in_file, in_bm25_column):
+def initial_data_load(in_file, in_bm25_column):
     '''
     When file is loaded, update the column dropdown choices
     '''
@@ -96,13 +96,15 @@ def put_columns_in_df(in_file, in_bm25_column):
     concat_choices = []
     index_load = None
     embed_load = np.array([])
+    tokenised_load =[]
     out_message = ""
+    current_source = ""
 
     file_list = [string.name for string in in_file]
 
     #print(file_list)
 
-    data_file_names = [string.lower() for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "search_index" not in string.lower()]
+    data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "search_index" not in string.lower()]
 
     if not data_file_names:
         out_message = "Please load in at least one csv/Excel/parquet data file."
@@ -110,6 +112,8 @@ def put_columns_in_df(in_file, in_bm25_column):
         return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), bm25_load, out_message
 
     data_file_name = data_file_names[0]
+
+    current_source = get_file_path_end_with_ext(data_file_name)
    
     
     df = read_file(data_file_name)
@@ -128,13 +132,13 @@ def put_columns_in_df(in_file, in_bm25_column):
     concat_choices.extend(new_choices)
 
     # Check if there is a search index file already
-    index_file_names = [string.lower() for string in file_list if "gz" in string.lower()]
+    index_file_names = [string for string in file_list if "gz" in string.lower()]
 
     if index_file_names:
         index_file_name = index_file_names[0]
         index_load = read_file(index_file_name)
 
-    embeddings_file_names = [string.lower() for string in file_list if "embedding" in string.lower()]
+    embeddings_file_names = [string for string in file_list if "embedding" in string.lower()]
 
     if embeddings_file_names:
         print("Loading embeddings from file.")
@@ -146,10 +150,14 @@ def put_columns_in_df(in_file, in_bm25_column):
     else:
         embed_load = np.array([])
 
+    tokenised_file_names = [string for string in file_list if "tokenised" in string.lower()]
+    if tokenised_file_names:
+        tokenised_load = read_file(tokenised_file_names[0])
+
     out_message = "Initial data check successful. Next, choose a data column to search in the drop down above, then click 'Load data'"
     print(out_message)
         
-    return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), df, index_load, embed_load, out_message
+    return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), df, index_load, embed_load, tokenised_load, out_message, current_source
 
 def put_columns_in_join_df(in_file):
     '''

@@ -92,8 +92,8 @@ def docs_to_jina_embed_np_array(docs_out, in_file, embeddings_state, return_inte
 
     #print(file_list)
 
-    embeddings_file_names = [string.lower() for string in file_list if "embedding" in string.lower()]
-    data_file_names = [string.lower() for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower()]# and "gz" not in string.lower()]
+    embeddings_file_names = [string for string in file_list if "embedding" in string.lower()]
+    data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower()]# and "gz" not in string.lower()]
     data_file_name = data_file_names[0]
     data_file_name_no_ext = get_file_path_end(data_file_name)
 

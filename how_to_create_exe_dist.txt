@@ -19,6 +19,9 @@ NOTE: for ensuring that spaCy models are loaded into the program correctly in re
 For one single file:
 python -m PyInstaller --additional-hooks-dir="build_deps\\" --hidden-import pyarrow.vendored.version --add-data="build_deps\\types.json;gradio_client" --add-data "model;model" --onefile --clean --noconfirm --name DataSearchApp_0.2.2 app.py
 
+If not using embedding model:
+python -m PyInstaller --additional-hooks-dir="build_deps\\" --hidden-import pyarrow.vendored.version --add-data="build_deps\\types.json;gradio_client"  --onefile --clean --noconfirm --name DataSearchApp_0.2.2_keyword app.py
+
 For a small exe with a folder of dependencies:
 python -m PyInstaller --additional-hooks-dir="build_deps\\" --hidden-import pyarrow.vendored.version --add-data="build_deps\\types.json;gradio_client" --add-data "model;model" --clean --noconfirm --name DataSearchApp_0.2.2 app.py
 

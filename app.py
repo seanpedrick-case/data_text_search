@@ -1,8 +1,8 @@
 from typing import Type
 from search_funcs.bm25_functions import prepare_bm25_input_data, prepare_bm25, bm25_search
-from search_funcs.semantic_ingest_functions import parse_csv_or_excel, csv_excel_text_to_docs
-from search_funcs.semantic_functions import docs_to_jina_embed_np_array, jina_simple_retrieval
-from search_funcs.helper_functions import dummy_function, display_info, put_columns_in_df, put_columns_in_join_df, get_temp_folder_path, empty_folder
+#from search_funcs.semantic_ingest_functions import parse_csv_or_excel, csv_excel_text_to_docs
+#from search_funcs.semantic_functions import docs_to_jina_embed_np_array, jina_simple_retrieval
+from search_funcs.helper_functions import dummy_function, display_info, initial_data_load, put_columns_in_join_df, get_temp_folder_path, empty_folder
 
 import gradio as gr
 import pandas as pd
@@ -25,6 +25,7 @@ with block:
     vectorstore_state = gr.State() # globals()["vectorstore"]
     embeddings_state = gr.State(np.array([])) # globals()["embeddings"]
     search_index_state = gr.State()
+    tokenised_state = gr.State()
 
     k_val = gr.State(9999)
     out_passages = gr.State(9999)
@@ -82,31 +83,31 @@ depends on factors such as the type of documents or queries. Information taken f
                 output_single_text = gr.Textbox(label="Top result")
                 output_file = gr.File(label="File output")
 
-    with gr.Tab("Semantic search"):
-        gr.Markdown(
-    """
-    **Thematic/semantic search**
+    # with gr.Tab("Semantic search"):
+    #     gr.Markdown(
+    # """
+    # **Thematic/semantic search**
 
-    This search type enables you to search for broader themes (e.g. happiness, nature) and the search will pick out text passages that relate to these themes even if they don't contain the exact words. 1. Load in data file (ideally a file with '_cleaned' at the end of the name, a pkl.gz file), with (optionally) the 'embeddings... .npz' file in the same folder to save loading time. 2. Select the field in your data to search. If you loaded in a documents pkl.gz file, this will be 'page_contents'. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the 'Enter semantic search query here' box below and press Enter/click on 'Start semantic search'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
-    """)
-        with gr.Row():
-            current_source_semantic = gr.Textbox(label="Current data source(s)", value="None")
+    # This search type enables you to search for broader themes (e.g. happiness, nature) and the search will pick out text passages that relate to these themes even if they don't contain the exact words. 1. Load in data file (ideally a file with '_cleaned' at the end of the name, a pkl.gz file), with (optionally) the 'embeddings... .npz' file in the same folder to save loading time. 2. Select the field in your data to search. If you loaded in a documents pkl.gz file, this will be 'page_contents'. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the 'Enter semantic search query here' box below and press Enter/click on 'Start semantic search'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
+    # """)
+    #     with gr.Row():
+    #         current_source_semantic = gr.Textbox(label="Current data source(s)", value="None")
 
-        with gr.Accordion("Load in data", open = True):
-            in_semantic_file = gr.File(label="Upload data file for semantic search", file_count= 'multiple', file_types = ['.parquet', '.csv', '.npy', '.npz', '.pkl', '.pkl.gz'])
+    #     with gr.Accordion("Load in data", open = True):
+    #         in_semantic_file = gr.File(label="Upload data file for semantic search", file_count= 'multiple', file_types = ['.parquet', '.csv', '.npy', '.npz', '.pkl', '.pkl.gz'])
             
-            with gr.Row():
-                in_semantic_column = gr.Dropdown(label="Enter the name of the text column in the data file to search")
-                load_semantic_data_button = gr.Button(value="Load data", variant="secondary")
+    #         with gr.Row():
+    #             in_semantic_column = gr.Dropdown(label="Enter the name of the text column in the data file to search")
+    #             load_semantic_data_button = gr.Button(value="Load data", variant="secondary")
                 
-            semantic_load_progress = gr.Textbox(label="Load progress")
+    #         semantic_load_progress = gr.Textbox(label="Load progress")
         
-        semantic_query = gr.Textbox(label="Enter semantic search query here")
-        semantic_submit = gr.Button(value="Start semantic search", variant="secondary", scale = 1)
+    #     semantic_query = gr.Textbox(label="Enter semantic search query here")
+    #     semantic_submit = gr.Button(value="Start semantic search", variant="secondary", scale = 1)
 
-        with gr.Row():
-            semantic_output_single_text = gr.Textbox(label="Top result")
-            semantic_output_file = gr.File(label="File output")
+    #     with gr.Row():
+    #         semantic_output_single_text = gr.Textbox(label="Top result")
+    #         semantic_output_file = gr.File(label="File output")
             
     with gr.Tab(label="Advanced options"):
         with gr.Accordion(label="Data load / save options", open = True):
@@ -148,12 +149,12 @@ depends on factors such as the type of documents or queries. Information taken f
     
     ### BM25 SEARCH ###
     # Update dropdowns upon initial file load
-    in_bm25_file.upload(put_columns_in_df, inputs=[in_bm25_file, in_bm25_column], outputs=[in_bm25_column, search_df_join_column, keyword_data_state, search_index_state, embeddings_state, load_finished_message])
+    in_bm25_file.upload(initial_data_load, inputs=[in_bm25_file, in_bm25_column], outputs=[in_bm25_column, search_df_join_column, keyword_data_state, search_index_state, embeddings_state, tokenised_state, load_finished_message, current_source])
     in_join_file.upload(put_columns_in_join_df, inputs=[in_join_file], outputs=[in_join_column, join_data_state, in_join_message])
  
     # Load in BM25 data
-    load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, keyword_data_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, keyword_data_state, output_file, output_file, current_source]).\
-    then(fn=prepare_bm25, inputs=[corpus_state, in_bm25_file, in_bm25_column, search_index_state, return_intermediate_files, in_k1, in_b, in_alpha], outputs=[load_finished_message, output_file])#.\
+    load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, keyword_data_state, tokenised_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, keyword_data_state, output_file, output_file]).\
+    then(fn=prepare_bm25, inputs=[corpus_state, in_bm25_file, in_bm25_column, search_index_state, in_clean_data, return_intermediate_files, in_k1, in_b, in_alpha], outputs=[load_finished_message, output_file])#.\
     
     # BM25 search functions on click or enter
     keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword")
@@ -161,20 +162,20 @@ depends on factors such as the type of documents or queries. Information taken f
     
     ### SEMANTIC SEARCH ###
     # Load in a csv/excel file for semantic search
-    in_semantic_file.upload(put_columns_in_df, inputs=[in_semantic_file, in_semantic_column], outputs=[in_semantic_column,  search_df_join_column, semantic_data_state, search_index_state, embeddings_state, semantic_load_progress])
-    load_semantic_data_button.click(parse_csv_or_excel, inputs=[in_semantic_file, semantic_data_state, in_semantic_column], outputs=[ingest_text, current_source_semantic, semantic_load_progress]).\
-             then(csv_excel_text_to_docs, inputs=[ingest_text, in_semantic_file, in_semantic_column, in_clean_data, return_intermediate_files], outputs=[ingest_docs, semantic_load_progress]).\
-             then(docs_to_jina_embed_np_array, inputs=[ingest_docs, in_semantic_file, embeddings_state, return_intermediate_files, embedding_super_compress], outputs=[semantic_load_progress, vectorstore_state, semantic_output_file])
+    # in_semantic_file.upload(initial_data_load, inputs=[in_semantic_file, in_semantic_column], outputs=[in_semantic_column,  search_df_join_column, semantic_data_state, search_index_state, embeddings_state, semantic_load_progress, current_source])
+    # load_semantic_data_button.click(parse_csv_or_excel, inputs=[in_semantic_file, semantic_data_state, in_semantic_column], outputs=[ingest_text, current_source_semantic, semantic_load_progress]).\
+    #          then(csv_excel_text_to_docs, inputs=[ingest_text, in_semantic_file, in_semantic_column, in_clean_data, return_intermediate_files], outputs=[ingest_docs, semantic_load_progress]).\
+    #          then(docs_to_jina_embed_np_array, inputs=[ingest_docs, in_semantic_file, embeddings_state, return_intermediate_files, embedding_super_compress], outputs=[semantic_load_progress, vectorstore_state, semantic_output_file])
     
-    # Semantic search query
-    semantic_submit.click(jina_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, semantic_min_distance, vec_weight, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic")
-    semantic_query.submit(jina_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, semantic_min_distance, vec_weight, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file])
+    # # Semantic search query
+    # semantic_submit.click(jina_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, semantic_min_distance, vec_weight, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic")
+    # semantic_query.submit(jina_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, semantic_min_distance, vec_weight, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file])
     
     # Dummy functions just to get dropdowns to work correctly with Gradio 3.50
     in_bm25_column.change(dummy_function, in_bm25_column, None)
     search_df_join_column.change(dummy_function, search_df_join_column, None)
     in_join_column.change(dummy_function, in_join_column, None)
-    in_semantic_column.change(dummy_function, in_join_column, None)
+    # in_semantic_column.change(dummy_function, in_join_column, None)
 
 block.queue().launch(debug=True)
 

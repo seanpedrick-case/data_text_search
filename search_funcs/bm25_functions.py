@@ -231,7 +231,7 @@ class BM25:
 
 # These following functions are my own work
 
-def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  return_intermediate_files = "No", progress=gr.Progress(track_tqdm=True)):
+def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, clean="No",  return_intermediate_files = "No", progress=gr.Progress(track_tqdm=True)):
 	print(in_file)
 
 	if not in_file:
@@ -243,7 +243,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 
 	#print(file_list)
 
-	data_file_names = [string.lower() for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "gz" not in string.lower()]
+	data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "gz" not in string.lower()]
 
 	if not data_file_names:
 		return None, "Please load in at least one csv/Excel/parquet data file.", data_state, None, None, None
@@ -260,8 +260,8 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 	## Load in pre-tokenised corpus if exists
 	tokenised_df = pd.DataFrame()
 
-	tokenised_file_names = [string.lower() for string in file_list if "tokenised" in string.lower()]
-	search_index_file_names = [string.lower() for string in file_list if "gz" in string.lower()]
+	tokenised_file_names = [string for string in file_list if "tokenised" in string.lower()]
+	search_index_file_names = [string for string in file_list if "gz" in string.lower()]
 
 	df[text_column] = df[text_column].astype(str).str.lower()
 
@@ -271,8 +271,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 		print(message)
 		return corpus, message, df, None, None, None
 
-	if tokenised_file_names:
-		tokenised_df = read_file(tokenised_file_names[0])
+	
 	
 	if clean == "Yes":
 		progress(0.1, desc = "Cleaning data")
@@ -300,12 +299,12 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 	
 	progress(0.4, desc = "Tokenising text")
 
-	if not tokenised_df.empty:
+	if tokenised_state:
+		tokenised_df = tokenised_state
 		corpus = tokenised_df.iloc[:,0].tolist()
-		print("Tokeniser loaded from file")
+		print("Tokenised data loaded from file")
 		#print("Corpus is: ", corpus[0:5])
 
-	# If doesn't already exist, tokenize texts in batches
 	else:
 		tokeniser_tic = time.perf_counter()
 		corpus = []
@@ -316,7 +315,6 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 		tokeniser_toc = time.perf_counter()
 		tokenizer_time_out = f"Tokenising the text took {tokeniser_toc - tokeniser_tic:0.1f} seconds."
 		print(tokenizer_time_out)
-		
 
 	if len(df_list) >= 20:
 		message = "Data loaded"
@@ -324,12 +322,16 @@ def prepare_bm25_input_data(in_file, text_column, data_state, clean="No",  retur
 		message = "Data loaded. Warning: dataset may be too short to get consistent search results."
 
 	if return_intermediate_files == "Yes":
-		tokenised_data_file_name = data_file_out_name_no_ext + "_" + "tokenised.parquet"
+		if clean == "Yes":
+			tokenised_data_file_name = data_file_out_name_no_ext + "_cleaned_tokenised.parquet"
+		else:
+			tokenised_data_file_name = data_file_out_name_no_ext + "_tokenised.parquet"
+
 		pd.DataFrame(data={"Corpus":corpus}).to_parquet(tokenised_data_file_name)
 
-		return corpus, message, df, out_file_name, tokenised_data_file_name, data_file_out_name
+		return corpus, message, df, out_file_name, tokenised_data_file_name
 
-	return corpus, message, df, out_file_name, None, data_file_out_name # tokenised_data_file_name
+	return corpus, message, df, out_file_name, None # tokenised_data_file_name
 
 def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_column, progress=gr.Progress(track_tqdm=True)):
 
@@ -357,7 +359,7 @@ def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_col
 
 	return file_name, new_text_column
 
-def prepare_bm25(corpus, in_file, text_column, search_index, return_intermediate_files, k1=1.5, b = 0.75, alpha=-5, progress=gr.Progress(track_tqdm=True)):
+def prepare_bm25(corpus, in_file, text_column, search_index, clean, return_intermediate_files, k1=1.5, b = 0.75, alpha=-5, progress=gr.Progress(track_tqdm=True)):
 	#bm25.save("saved_df_bm25")
 	#bm25 = BM25.load(re.sub(r'\.pkl$', '', file_in.name))
 
@@ -385,7 +387,7 @@ def prepare_bm25(corpus, in_file, text_column, search_index, return_intermediate
 	#print(file_list)
 
 	# Get data file name
-	data_file_names = [string.lower() for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "gz" not in string.lower()]
+	data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "gz" not in string.lower()]
 
 	if not data_file_names:
 		return "Please load in at least one csv/Excel/parquet data file.", None
@@ -395,7 +397,7 @@ def prepare_bm25(corpus, in_file, text_column, search_index, return_intermediate
 	data_file_name_no_ext = get_file_path_end(data_file_name)
 
 	# Check if there is a search index file already
-	#index_file_names = [string.lower() for string in file_list if "gz" in string.lower()]
+	#index_file_names = [string for string in file_list if "gz" in string.lower()]
 
 	progress(0.6, desc = "Preparing search index")
 
@@ -422,8 +424,12 @@ def prepare_bm25(corpus, in_file, text_column, search_index, return_intermediate
 	if return_intermediate_files == "Yes":
 		print("Saving search index file")
 		progress(0.8, desc = "Saving search index to file")
-		bm25_search_file_name = data_file_name_no_ext + '_' + 'search_index.pkl.gz'
-		#np.savez_compressed(bm25_search_file_name, bm25)
+
+		if clean == "Yes":
+			bm25_search_file_name = data_file_name_no_ext + '_cleaned_search_index.pkl.gz'
+		else:
+			bm25_search_file_name = data_file_name_no_ext + '_search_index.pkl.gz'
+			#np.savez_compressed(bm25_search_file_name, bm25)
 
 		with gzip.open(bm25_search_file_name, 'wb') as file:
 				pickle.dump(bm25, file)

@@ -130,7 +130,7 @@ def parse_csv_or_excel(file_path, data_state, text_column = "text"):
 
         #print(file_list)
 
-        data_file_names = [string.lower() for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower()]# and "gz" not in string.lower()]
+        data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower()]# and "gz" not in string.lower()]
         
         data_file_name = data_file_names[0]
         
@@ -303,7 +303,7 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
     
     file_list = [string.name for string in in_file]
 
-    data_file_names = [string.lower() for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
+    data_file_names = [string for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
 
     if not data_file_names:
         return doc_sections, "Please load in at least one csv/Excel/parquet data file."
