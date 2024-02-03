@@ -214,7 +214,7 @@ def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_c
 
         results_df_out[search_df_join_column] = results_df_out[search_df_join_column].astype(str).str.replace("\.0$","", regex=True)
 
-        results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left")#.drop(in_join_column, axis=1)
+        results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left", suffixes=('','_y'))#.drop(in_join_column, axis=1)
 
     return results_df_out
 

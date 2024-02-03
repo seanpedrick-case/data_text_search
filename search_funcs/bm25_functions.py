@@ -236,7 +236,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 
 	if not in_file:
 		print("No input file found. Please load in at least one file.")
-		return None, "No input file found. Please load in at least one file.", data_state, None, None, None
+		return None, "No input file found. Please load in at least one file.", data_state, None, None, None, []
 
 	progress(0, desc = "Loading in data")
 	file_list = [string.name for string in in_file]
@@ -246,10 +246,10 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 	data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "gz" not in string.lower()]
 
 	if not data_file_names:
-		return None, "Please load in at least one csv/Excel/parquet data file.", data_state, None, None, None
+		return None, "Please load in at least one csv/Excel/parquet data file.", data_state, None, None, None, []
 
 	if not text_column:
-		return None, "Please enter a column name to search.", data_state, None, None, None
+		return None, "Please enter a column name to search.", data_state, None, None, None, []
 
 	data_file_name = data_file_names[0]
 
@@ -329,9 +329,9 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 
 		pd.DataFrame(data={"Corpus":corpus}).to_parquet(tokenised_data_file_name)
 
-		return corpus, message, df, out_file_name, tokenised_data_file_name
+		return corpus, message, df, out_file_name, tokenised_data_file_name, df_list
 
-	return corpus, message, df, out_file_name, None # tokenised_data_file_name
+	return corpus, message, df, out_file_name, None, df_list
 
 def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_column, progress=gr.Progress(track_tqdm=True)):
 
@@ -506,7 +506,7 @@ def bm25_search(free_text_query, in_no_search_results, original_data, text_colum
 		# Duplicates dropped so as not to expand out dataframe
 		join_df = join_df.drop_duplicates(in_join_column)
 
-		results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left")#.drop(in_join_column, axis=1)
+		results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left", suffixes=('','_y'))#.drop(in_join_column, axis=1)
 
 	# Reorder results by score
 	results_df_out = results_df_out.sort_values('search_score_abs', ascending=False)

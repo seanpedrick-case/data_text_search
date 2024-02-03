@@ -3,6 +3,8 @@ from search_funcs.bm25_functions import prepare_bm25_input_data, prepare_bm25, b
 #from search_funcs.semantic_ingest_functions import parse_csv_or_excel, csv_excel_text_to_docs
 #from search_funcs.semantic_functions import docs_to_jina_embed_np_array, jina_simple_retrieval
 from search_funcs.helper_functions import dummy_function, display_info, initial_data_load, put_columns_in_join_df, get_temp_folder_path, empty_folder
+from search_funcs.spacy_search_funcs import spacy_fuzzy_search
+
 
 import gradio as gr
 import pandas as pd
@@ -33,6 +35,7 @@ with block:
 
     corpus_state = gr.State()
     keyword_data_state = gr.State(pd.DataFrame())
+    keyword_data_list_state = gr.State([])
     join_data_state = gr.State(pd.DataFrame())
     semantic_data_state = gr.State(pd.DataFrame())
 
@@ -74,14 +77,14 @@ depends on factors such as the type of documents or queries. Information taken f
                 load_finished_message = gr.Textbox(label="Load progress", scale = 2)
 
         with gr.Accordion(label = "Search data", open=True):
+            keyword_query = gr.Textbox(label="Enter your search term")
             with gr.Row():
-                keyword_query = gr.Textbox(label="Enter your search term")
-                             
-            keyword_search_button = gr.Button(value="Search text")
-
+                keyword_search_button = gr.Button(value="Keyword search", variant="primary")
+                fuzzy_search_button = gr.Button(value="Fuzzy search (much slower)", variant="secondary")
             with gr.Row():
                 output_single_text = gr.Textbox(label="Top result")
                 output_file = gr.File(label="File output")
+
 
     # with gr.Tab("Semantic search"):
     #     gr.Markdown(
@@ -131,8 +134,10 @@ depends on factors such as the type of documents or queries. Information taken f
                 in_no_search_results_button = gr.Button(value = "Search results number info", scale = 1)
             with gr.Row():
                 in_search_param_button = gr.Button(value="Load search parameters (Need to click this if you changed anything above)")
-        with gr.Accordion(label="Semantic search options", open = False):
-            semantic_min_distance = gr.Slider(label = "Minimum distance score for search result to be included", value = 0.75, minimum=0, maximum=0.95, step=0.01)
+        with gr.Accordion(label="Fuzzy search options", open = False):
+                no_spelling_mistakes = gr.Slider(label = "Number of spelling mistakes allowed in fuzzy search", value = 1, minimum=1, maximum=4, step=1)
+       # with gr.Accordion(label="Semantic search options", open = False):
+       #     semantic_min_distance = gr.Slider(label = "Minimum distance score for search result to be included", value = 0.75, minimum=0, maximum=0.95, step=0.01)
         with gr.Accordion(label = "Join on additional dataframes to results", open = False):
             in_join_file = gr.File(label="Upload your data to join here")
             in_join_message = gr.Textbox(label="Join file load progress")
@@ -153,12 +158,16 @@ depends on factors such as the type of documents or queries. Information taken f
     in_join_file.upload(put_columns_in_join_df, inputs=[in_join_file], outputs=[in_join_column, join_data_state, in_join_message])
  
     # Load in BM25 data
-    load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, keyword_data_state, tokenised_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, keyword_data_state, output_file, output_file]).\
+    load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, keyword_data_state, tokenised_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, keyword_data_state, output_file, output_file, keyword_data_list_state]).\
     then(fn=prepare_bm25, inputs=[corpus_state, in_bm25_file, in_bm25_column, search_index_state, in_clean_data, return_intermediate_files, in_k1, in_b, in_alpha], outputs=[load_finished_message, output_file])#.\
     
     # BM25 search functions on click or enter
     keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword")
     keyword_query.submit(fn=bm25_search, inputs=[keyword_query, in_no_search_results, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file])
+
+    # Fuzzy search functions on click
+
+    fuzzy_search_button.click(fn=spacy_fuzzy_search, inputs=[keyword_query, keyword_data_list_state, keyword_data_state, in_bm25_column, join_data_state, search_df_join_column, in_join_column, no_spelling_mistakes], outputs=[output_single_text, output_file], api_name="fuzzy")
     
     ### SEMANTIC SEARCH ###
     # Load in a csv/excel file for semantic search

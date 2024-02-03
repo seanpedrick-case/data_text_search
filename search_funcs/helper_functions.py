@@ -72,11 +72,11 @@ def read_file(filename):
     print("Loading in file")
 
     if file_type == 'csv':
-        file = pd.read_csv(filename, low_memory=False).reset_index().drop(["index", "Unnamed: 0"], axis=1, errors="ignore")
+        file = pd.read_csv(filename, low_memory=False).reset_index()#.drop(["index", "Unnamed: 0"], axis=1, errors="ignore")
     elif file_type == 'xlsx':
-        file = pd.read_excel(filename).reset_index().drop(["index", "Unnamed: 0"], axis=1, errors="ignore")
+        file = pd.read_excel(filename).reset_index()#.drop(["index", "Unnamed: 0"], axis=1, errors="ignore")
     elif file_type == 'parquet':
-        file = pd.read_parquet(filename).reset_index().drop(["index", "Unnamed: 0"], axis=1, errors="ignore")
+        file = pd.read_parquet(filename).reset_index()#.drop(["index", "Unnamed: 0"], axis=1, errors="ignore")
     elif file_type == 'pkl.gz':
         with gzip.open(filename, 'rb') as file:
             file = pickle.load(file)
