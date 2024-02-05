@@ -30,8 +30,6 @@ def empty_folder(directory_path):
             #print(f'Failed to delete {file_path}. Reason: {e}')
             print('')
 
-
-
 def get_file_path_end(file_path):
     # First, get the basename of the file (e.g., "example.txt" from "/path/to/example.txt")
     basename = os.path.basename(file_path)

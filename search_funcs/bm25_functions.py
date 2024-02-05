@@ -6,7 +6,6 @@ import sys
 import gzip
 import time
 import pandas as pd
-import numpy as np
 from numpy import inf
 import gradio as gr
 
@@ -15,7 +14,7 @@ from datetime import datetime
 today_rev = datetime.now().strftime("%Y%m%d")
 
 from search_funcs.clean_funcs import initial_clean # get_lemma_tokens, stem_sentence
-from search_funcs.helper_functions import read_file, get_file_path_end_with_ext, get_file_path_end
+from search_funcs.helper_functions import get_file_path_end_with_ext, get_file_path_end
 
 # Load the SpaCy model
 from spacy.cli.download import download

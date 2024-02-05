@@ -1,4 +1,6 @@
 import spacy
+spacy.prefer_gpu()
+from spacy.cli.download import download
 from spacy.matcher import Matcher
 import numpy as np
 import gradio as gr
@@ -10,14 +12,26 @@ PandasDataFrame = Type[pd.DataFrame]
 
 today_rev = datetime.now().strftime("%Y%m%d")
 
-nlp = spacy.load("en_core_web_sm")
+# Load the SpaCy model
 
-string_query = "knife attack run fast"
-df_list = ["Last week someone was grievously injured in a knife attack on Exmoor road. Running away. They ran as fast as possible. I run.","This is the 3rd knifing in the area in as many weeks; knives everywhere.", "attacks of this kind have been increasing for years. Knife attack or knife attack.", "Nothing happened here"]
-
+#os.system("python -m spacy download en_core_web_sm")
+try:
+	import en_core_web_sm
+	nlp = en_core_web_sm.load()
+	print("Successfully imported spaCy model")
+    #nlp = spacy.load("en_core_web_sm")
+    #print(nlp._path)
+except:
+	download("en_core_web_sm")
+	nlp = spacy.load("en_core_web_sm")
+	print("Successfully imported spaCy model")
 
 def spacy_fuzzy_search(string_query:str, df_list: List[str], original_data: PandasDataFrame, text_column:str, in_join_file: PandasDataFrame, search_df_join_column:str, in_join_column:str, no_spelling_mistakes:int = 1, progress=gr.Progress(track_tqdm=True)):
     ''' Conduct fuzzy match on a list of data.'''
+
+    if len(df_list) > 10000:
+         out_message = "Your data has more than 10,000 rows and will take more than three minutes to do a fuzzy search. Please try keyword or semantic search for data of this size." 
+         return out_message, None
 
     query = nlp(string_query)
     tokenised_query = [token.text for token in query]

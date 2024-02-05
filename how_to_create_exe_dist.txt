@@ -6,24 +6,27 @@
 
 NOTE: for ensuring that spaCy models are loaded into the program correctly in requirements.txt, follow this guide: https://spacy.io/usage/models#models-download
 
-4. In file explorer, navigate to the miniconda/envs/new_env/Lib/site-packages/gradio-client/ folder
-
-5. Copy types.json from the gradio_client folder to the folder containing the data_text_search.py file
-
-6. If necessary, create hook- files to tell pyinstaller to include specific packages in the exe build. Examples are provided for gradio and en_core_web_sm (a spaCy model).
+6. If necessary, create hook- files to tell pyinstaller to include specific packages in the exe build. Examples are provided for gradio and en_core_web_sm (a spaCy model). Put these in the build_deps\ subfolder
 
 7. pip install pyinstaller
 
-8. In command line, cd to the folder that contains app.py. Then run the following:
+8. In command line, cd to the folder that contains app.py. 
 
-For one single file:
-python -m PyInstaller --additional-hooks-dir="build_deps\\" --hidden-import pyarrow.vendored.version --add-data="build_deps\\types.json;gradio_client" --add-data "model;model" --onefile --clean --noconfirm --name DataSearchApp_0.2.2 app.py
+9.Run the following, assuming you want to make one single .exe file (This helped me: https://github.com/pyinstaller/pyinstaller/issues/8108):
 
-If not using embedding model:
-python -m PyInstaller --additional-hooks-dir="build_deps\\" --hidden-import pyarrow.vendored.version --add-data="build_deps\\types.json;gradio_client"  --onefile --clean --noconfirm --name DataSearchApp_0.2.2_keyword app.py
+a) In command line: pyi-makespec --additional-hooks-dir="build_deps\\" --collect-data=gradio_client --collect-data=gradio --hidden-import pyarrow.vendored.version --onefile --name DataSearchApp_0.2.3 app.py
 
-For a small exe with a folder of dependencies:
-python -m PyInstaller --additional-hooks-dir="build_deps\\" --hidden-import pyarrow.vendored.version --add-data="build_deps\\types.json;gradio_client" --add-data "model;model" --clean --noconfirm --name DataSearchApp_0.2.2 app.py
+b) Open the created spec file in Notepad. Add the following to the end of the Analysis section then save:
+
+a = Analysis(
+    ...
+    module_collection_mode={
+        'gradio': 'py',  # Collect gradio package as source .py files
+    }
+)
+
+c) Back in command line, run this: pyinstaller --clean --noconfirm DataSearchApp_0.2.3.spec
+
 
 9. A 'dist' folder will be created with the executable inside along with all dependencies('dist\data_text_search'). 
 

@@ -5,13 +5,13 @@ from typing import Type
 import gradio as gr
 import numpy as np
 from datetime import datetime
-import accelerate
+#from transformers import AutoModel, AutoTokenizer
+from search_funcs.helper_functions import get_file_path_end
+#import torch
+from torch import cuda, backends#, tensor, mm, utils
+from sentence_transformers import SentenceTransformer
 
 today_rev = datetime.now().strftime("%Y%m%d")
-
-from transformers import AutoModel
-
-from torch import cuda, backends, tensor, mm
 
 # Check for torch cuda
 print("Is CUDA enabled? ", cuda.is_available())
@@ -29,45 +29,49 @@ print("Device used is: ", torch_device)
 
 PandasDataFrame = Type[pd.DataFrame]
 
-# Load embeddings
+# Load embeddings - Jina - deprecated
 # Pinning a Jina revision for security purposes: https://www.baseten.co/blog/pinning-ml-model-revisions-for-compatibility-and-security/
 # Save Jina model locally as described here: https://huggingface.co/jinaai/jina-embeddings-v2-base-en/discussions/29
-embeddings_name = "jinaai/jina-embeddings-v2-small-en"
-local_embeddings_location = "model/jina/"
-revision_choice = "b811f03af3d4d7ea72a7c25c802b21fc675a5d99"
+# embeddings_name = "jinaai/jina-embeddings-v2-small-en"
+# local_embeddings_location = "model/jina/"
+# revision_choice = "b811f03af3d4d7ea72a7c25c802b21fc675a5d99"
 
-try:
-    embeddings_model = AutoModel.from_pretrained(local_embeddings_location, revision = revision_choice, trust_remote_code=True,local_files_only=True, device_map="auto")
-except:
-    embeddings_model = AutoModel.from_pretrained(embeddings_name, revision = revision_choice, trust_remote_code=True, device_map="auto")
+# try:
+#     embeddings_model = AutoModel.from_pretrained(local_embeddings_location, revision = revision_choice, trust_remote_code=True,local_files_only=True, device_map="auto")
+# except:
+#     embeddings_model = AutoModel.from_pretrained(embeddings_name, revision = revision_choice, trust_remote_code=True, device_map="auto")
 
+# Load embeddings
+embeddings_name = "BAAI/bge-small-en-v1.5"
+local_embeddings_location = "model/bge/"
 
-def get_file_path_end(file_path):
-    # First, get the basename of the file (e.g., "example.txt" from "/path/to/example.txt")
-    basename = os.path.basename(file_path)
+#try:
+#    tokenizer = AutoTokenizer.from_pretrained(embeddings_name)
+#    embeddings_model = AutoModel.from_pretrained(local_embeddings_location, local_files_only=True).to(torch_device)
+#except:
+#    tokenizer = AutoTokenizer.from_pretrained(embeddings_name)
+#    embeddings_model = AutoModel.from_pretrained(embeddings_name).to(torch_device)
+
+# Not using SentenceTransformer here
+embeddings_model = SentenceTransformer(embeddings_name)
     
-    # Then, split the basename and its extension and return only the basename without the extension
-    filename_without_extension, _ = os.path.splitext(basename)
+# def calc_bge_norm_embeddings(docs, embeddings_model=embeddings_model, tokenizer=tokenizer, progress=gr.Progress(track_tqdm=True)):
+#     # Tokenize sentences
+#     print("Tokenising")
+#     encoded_input = tokenizer(docs, padding=True, truncation=True, return_tensors='pt', max_length=32).to(torch_device)
 
-    #print(filename_without_extension)
-    
-    return filename_without_extension
+#     # Compute token embeddings
+#     print("Calculating embeddings")
+#     with torch.no_grad():
+#         model_output = embeddings_model(**encoded_input).to(torch_device)
+#         # Perform pooling. In this case, cls pooling.
+#         embeddings_out = model_output[0][:, 0]
+#     # normalize embeddings
+#     embeddings_out = torch.nn.functional.normalize(embeddings_out, p=2, dim=1)
+#     #print("Sentence embeddings:", embeddings_out)
 
-def load_embeddings(embeddings_name = embeddings_name):
-    '''
-    Load embeddings model and create a global variable based on it.
-    '''
+#     return embeddings_out
 
-    # Import Chroma and instantiate a client. The default Chroma client is ephemeral, meaning it will not save to disk.
-    
-    #else: 
-    embeddings_func = AutoModel.from_pretrained(embeddings_name, trust_remote_code=True, device_map="auto")
-
-    global embeddings
-
-    embeddings = embeddings_func
-
-    return embeddings
 
 def docs_to_jina_embed_np_array(docs_out, in_file, embeddings_state, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings = embeddings_model, progress=gr.Progress(track_tqdm=True)):
     '''
@@ -79,7 +83,7 @@ def docs_to_jina_embed_np_array(docs_out, in_file, embeddings_state, return_inte
         return out_message, None, None
         
 
-    progress(0.7, desc = "Loading/creating embeddings")
+    progress(0.6, desc = "Loading/creating embeddings")
 
     print(f"> Total split documents: {len(docs_out)}")
 
@@ -124,6 +128,81 @@ def docs_to_jina_embed_np_array(docs_out, in_file, embeddings_state, return_inte
                 np.savez_compressed(semantic_search_file_name, embeddings_out)
             else:
                 semantic_search_file_name = data_file_name_no_ext + '_' + 'embedding_compress.npz'
+                embeddings_out_round = np.round(embeddings_out, 3) 
+                embeddings_out_round *= 100 # Rounding not currently used
+                np.savez_compressed(semantic_search_file_name, embeddings_out_round)
+
+            return out_message, embeddings_out, semantic_search_file_name
+
+        return out_message, embeddings_out, None
+    else:
+        # Just return existing embeddings if already exist
+        embeddings_out = embeddings_state
+    
+    print(out_message)
+
+    return out_message, embeddings_out, None#, None
+
+
+def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings_model = embeddings_model, progress=gr.Progress(track_tqdm=True)):
+    '''
+    Takes a Langchain document class and saves it into a Chroma sqlite file.
+    '''
+    if not in_file:
+        out_message = "No input file found. Please load in at least one file."
+        print(out_message)
+        return out_message, None, None
+        
+
+    progress(0.6, desc = "Loading/creating embeddings")
+
+    print(f"> Total split documents: {len(docs_out)}")
+
+    #print(docs_out)
+
+    page_contents = [doc.page_content for doc in docs_out]
+
+    ## Load in pre-embedded file if exists
+    file_list = [string.name for string in in_file]
+
+    #print(file_list)
+
+    embeddings_file_names = [string for string in file_list if "embedding" in string.lower()]
+    data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower()]# and "gz" not in string.lower()]
+    data_file_name = data_file_names[0]
+    data_file_name_no_ext = get_file_path_end(data_file_name)
+
+    out_message = "Document processing complete. Ready to search."
+
+     # print("embeddings loaded: ", embeddings_out)
+
+    if embeddings_state.size == 0:
+        tic = time.perf_counter()
+        print("Starting to embed documents.")
+        #embeddings_list = []
+        #for page in progress.tqdm(page_contents, desc = "Preparing search index", unit = "rows"):
+        #    embeddings_list.append(embeddings.encode(sentences=page, max_length=1024).tolist())
+
+        
+        
+        #embeddings_out = calc_bge_norm_embeddings(page_contents, embeddings_model, tokenizer)
+
+        embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = 32, normalize_embeddings=True) # For BGE
+        #embeddings_list = embeddings.encode(sentences=page_contents, normalize_embeddings=True).tolist() # For BGE embeddings
+        #embeddings_list = embeddings.encode(sentences=page_contents).tolist() # For minilm
+
+        toc = time.perf_counter()
+        time_out = f"The embedding took {toc - tic:0.1f} seconds"
+        print(time_out)
+
+        # If you want to save your files for next time
+        if return_intermediate_files == "Yes":
+            progress(0.9, desc = "Saving embeddings to file")
+            if embeddings_super_compress == "No":
+                semantic_search_file_name = data_file_name_no_ext + '_bge_embeddings.npz'
+                np.savez_compressed(semantic_search_file_name, embeddings_out)
+            else:
+                semantic_search_file_name = data_file_name_no_ext + '_bge_embedding_compress.npz'
                 embeddings_out_round = np.round(embeddings_out, 3) 
                 embeddings_out_round *= 100 # Rounding not currently used
                 np.savez_compressed(semantic_search_file_name, embeddings_out_round)
@@ -217,6 +296,88 @@ def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_c
         results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left", suffixes=('','_y'))#.drop(in_join_column, axis=1)
 
     return results_df_out
+
+def bge_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_val:int, out_passages:int,
+                           vec_score_cut_off:float, vec_weight:float, in_join_file, in_join_column = None, search_df_join_column = None, device = torch_device, embeddings = embeddings_model, progress=gr.Progress(track_tqdm=True)): # ,vectorstore, embeddings
+
+    # print("vectorstore loaded: ", vectorstore)
+    progress(0, desc = "Conducting semantic search")
+
+    print("Searching")
+
+    # Convert it to a PyTorch tensor and transfer to GPU
+    #vectorstore_tensor = tensor(vectorstore).to(device)
+
+    # Load the sentence transformer model and move it to GPU
+    embeddings = embeddings.to(device)
+
+    # Encode the query using the sentence transformer and convert to a PyTorch tensor
+    query = embeddings.encode(query_str, normalize_embeddings=True)
+
+    # query = calc_bge_norm_embeddings(query_str, embeddings_model=embeddings_model, tokenizer=tokenizer)
+
+    #query_tensor = tensor(query).to(device)
+
+    # if query_tensor.dim() == 1:
+    #     query_tensor = query_tensor.unsqueeze(0)  # Reshape to 2D with one row
+
+    # Sentence transformers method, not used:
+    cosine_similarities = query @ vectorstore.T
+    #cosine_similarities = util.cos_sim(query_tensor, vectorstore_tensor)[0]
+    #top_results = torch.topk(cos_scores, k=top_k)
+   
+
+    # Normalize the query tensor and vectorstore tensor
+    #query_norm = query_tensor / query_tensor.norm(dim=1, keepdim=True)
+    #vectorstore_norm = vectorstore_tensor / vectorstore_tensor.norm(dim=1, keepdim=True)
+
+    # Calculate cosine similarities (batch processing)
+    #cosine_similarities = mm(query_norm, vectorstore_norm.T)
+    #cosine_similarities = mm(query_tensor, vectorstore_tensor.T)
+
+    # Flatten the tensor to a 1D array
+    cosine_similarities = cosine_similarities.flatten()
+
+    # Convert to a NumPy array if it's still a PyTorch tensor
+    #cosine_similarities = cosine_similarities.cpu().numpy()
+
+    # Create a Pandas Series
+    cosine_similarities_series = pd.Series(cosine_similarities)
+
+    # Pull out relevent info from docs
+    page_contents = [doc.page_content for doc in docs]
+    page_meta = [doc.metadata for doc in docs]
+    ids_range = range(0,len(page_contents)) 
+    ids = [str(element) for element in ids_range]
+
+    df_docs = pd.DataFrame(data={"ids": ids,
+                                "documents": page_contents,
+                                    "metadatas":page_meta,
+                                    "distances":cosine_similarities_series}).sort_values("distances", ascending=False).iloc[0:k_val,:]
+
+    
+    results_df_out = process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_cut_off, vec_weight, orig_df_col, in_join_column, search_df_join_column)
+
+    print("Search complete")
+
+    # If nothing found, return error message
+    if results_df_out.empty:
+        return 'No result found!', None
+    
+    query_str_file = query_str.replace(" ", "_")
+
+    results_df_name = "semantic_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
+
+    print("Saving search output to file")
+    progress(0.7, desc = "Saving search output to file")
+
+    results_df_out.to_excel(results_df_name, index= None)
+    results_first_text = results_df_out.iloc[0, 1]
+
+    print("Returning results")
+
+    return results_first_text, results_df_name
+
 
 def jina_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_val:int, out_passages:int,
                            vec_score_cut_off:float, vec_weight:float, in_join_file, in_join_column = None, search_df_join_column = None, device = torch_device, embeddings = embeddings_model, progress=gr.Progress(track_tqdm=True)): # ,vectorstore, embeddings

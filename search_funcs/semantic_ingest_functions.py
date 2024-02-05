@@ -1,12 +1,11 @@
-# Install/ import stuff we need
-
-import os
+# Install/ import packages
 import time
 import re
 import ast
 import gzip
 import pandas as pd
 import gradio as gr
+import pickle
 from typing import Type, List, Literal
 #from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -35,19 +34,6 @@ start_index = True
 from search_funcs.helper_functions import get_file_path_end_with_ext, detect_file_type, get_file_path_end
 from search_funcs.bm25_functions import save_prepared_bm25_data
 from search_funcs.clean_funcs import initial_clean
-
-## Parse files
-# def detect_file_type(file_path):
-#         """
-#         Determine the file type based on its extension.
-    
-#         Parameters:
-#             file_path (str): Path to the file.
-    
-#         Returns:
-#             str: File extension (e.g., '.pdf', '.docx', '.txt', '.html').
-#         """
-#         return os.path.splitext(file_path)[1].lower()
 
 def parse_file_not_used(file_paths, text_column='text'):
     """
@@ -124,8 +110,6 @@ def parse_csv_or_excel(file_path, data_state, text_column = "text"):
             Pandas DataFrame: Dataframe output from file read
         """
 
-        #out_df = pd.DataFrame()
-
         file_list = [string.name for string in file_path]
 
         #print(file_list)
@@ -137,40 +121,10 @@ def parse_csv_or_excel(file_path, data_state, text_column = "text"):
         #for file_path in file_paths:
         file_name = get_file_path_end_with_ext(data_file_name)
 
-        #print(file_extension)
-
-        # if file_extension == "csv":
-        #         df = pd.read_csv(data_file_names[0], low_memory=False)
-        #         if text_column not in df.columns: return pd.DataFrame(), ['Please choose a valid column name']
-        #         df['source'] = file_name
-        #         df['page_section'] = ""
-        # elif file_extension == "xlsx":
-        #         df = pd.read_excel(data_file_names[0], engine='openpyxl')
-        #         if text_column not in df.columns: return pd.DataFrame(), ['Please choose a valid column name']
-        #         df['source'] = file_name
-        #         df['page_section'] = ""
-        # elif file_extension == "parquet":
-        #         df = pd.read_parquet(data_file_names[0])
-        #         if text_column not in df.columns: return pd.DataFrame(), ['Please choose a valid column name']
-        #         df['source'] = file_name
-        #         df['page_section'] = ""
-        # else:
-        #         print(f"Unsupported file type: {file_extension}")
-        #         return pd.DataFrame(), ['Please choose a valid file type']
-        
-        df = data_state
-        #df['source'] = file_name
-        #df['page_section'] = ""
-
         message = "Loaded in file. Now converting to document format."
         print(message)
 
-        return df, file_name, message
-
-
-# +
-# Convert parsed text to docs
-# -
+        return data_state, file_name, message
 
 def write_out_metadata_as_string(metadata_in):
     # If metadata_in is a single dictionary, wrap it in a list
@@ -241,63 +195,10 @@ def parse_metadata(row):
         # Handle the error or log it
         return None  # or some default value
 
-# def csv_excel_text_to_docs_deprecated(df, text_column='text', chunk_size=None) -> List[Document]:
-#     """Converts a DataFrame's content to a list of Documents with metadata."""
-
-#     print("Converting to documents.")
-
-#     doc_sections = []
-#     df[text_column] = df[text_column].astype(str) # Ensure column is a string column
-
-#     # For each row in the dataframe
-#     for idx, row in df.iterrows():
-#         # Extract the text content for the document
-#         doc_content = row[text_column]
-        
-#         # Generate metadata containing other columns' data
-#         metadata = {"row": idx + 1}
-#         for col, value in row.items():
-#             if col != text_column:
-#                 metadata[col] = value
-
-#         metadata_string = write_out_metadata_as_string(metadata)[0]      
-
-#         # If chunk_size is provided, split the text into chunks
-#         if chunk_size:
-#             sections = split_string_into_chunks(doc_content, chunk_size, split_strat)
-
-#             # Langchain usage deprecated
-#             # text_splitter = RecursiveCharacterTextSplitter(
-#             #    chunk_size=chunk_size,
-#             #    chunk_overlap=chunk_overlap,
-#             #    split_strat=split_strat,
-#             #    start_index=start_index                
-#             # ) #Other arguments as required by the splitter
-
-#             # sections = text_splitter.split_text(doc_content)
-   
-#             # For each section, create a Document object
-#             for i, section in enumerate(sections):
-#                 section = '. '.join([metadata_string, section])
-#                 doc = Document(page_content=section, 
-#                               metadata={**metadata, "section": i, "row_section": f"{metadata['row']}-{i}"})
-#                 doc_sections.append(doc)
-
-#         else:
-#             # If no chunk_size is provided, create a single Document object for the row
-#             #doc_content = '. '.join([metadata_string, doc_content])
-#             doc = Document(page_content=doc_content, metadata=metadata)
-#             doc_sections.append(doc)
-
-#         message = "Data converted to document format. Now creating/loading document embeddings."
-#         print(message)
-
-#     return doc_sections, message
-
 def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_intermediate_files = "No", chunk_size=None, progress=gr.Progress(track_tqdm=True)) -> List[Document]:
     """Converts a DataFrame's content to a list of dictionaries in the 'Document' format, containing page_content and associated metadata."""
     if not in_file:
-        return None, "Please load in at least one file.", data_state, None, None, None
+        return None, "Please load in at least one file.", df, None, None, None
 
     progress(0, desc = "Loading in data")
     
@@ -309,7 +210,7 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         return doc_sections, "Please load in at least one csv/Excel/parquet data file."
 
     if not text_column:
-        return None, "Please enter a column name to search", data_state, None, None, None
+        return None, "Please enter a column name to search", df, None, None, None
 
     data_file_name = data_file_names[0]
 
@@ -336,6 +237,8 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
     doc_sections = []
     df[text_column] = df[text_column].astype(str).str.strip() # Ensure column is a string column
 
+    original_text_column = text_column
+
     if clean == "Yes":
         progress(0.1, desc = "Cleaning data")
         clean_tic = time.perf_counter()
@@ -343,21 +246,29 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         
         #df = df.drop_duplicates(text_column)
         
-        df[text_column] = initial_clean(df[text_column])
         df_list = list(df[text_column])
+        df_list = initial_clean(df_list)
 
-        # Save to file if you have cleaned the data
+        # Get rid of old data and keep only the new
+        #df = df.drop(text_column, axis = 1)
+
+        
+
+        # Save to file if you have cleaned the data. Text column has now been renamed with '_cleaned' at the send
         out_file_name, text_column = save_prepared_bm25_data(data_file_name, df_list, df, text_column)
+
+        df[text_column] = df_list
+
 
         clean_toc = time.perf_counter()
         clean_time_out = f"Cleaning the text took {clean_toc - clean_tic:0.1f} seconds."
         print(clean_time_out)
 
-    cols = [col for col in df.columns if col != text_column]
+    cols = [col for col in df.columns if col != original_text_column]
 
     df["metadata"] = combine_metadata_columns(df, cols)
 
-    df = df.rename(columns={text_column:"page_content"})
+    #df = df.rename(columns={text_column:"page_content"})
 
     #print(df[["page_content", "metadata"]].to_dict(orient='records'))
 
@@ -367,7 +278,7 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
     progress(0.3, desc = "Converting data to document format")
 
     # Create a list of Document objects
-    doc_sections = [Document(page_content=row['page_content'], 
+    doc_sections = [Document(page_content=row[text_column], 
                         metadata= parse_metadata(row["metadata"]))
                 for index, row in progress.tqdm(df.iterrows(), desc = "Splitting up text", unit = "rows")]
 
@@ -387,7 +298,6 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         #print(page_content_series_string[0])
         #metadata_series_string = pd.Series(doc_sections[1]).astype(str)
 
-        import pickle
 
         if clean == "No":
             #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs.parquet")
@@ -399,14 +309,13 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         elif clean == "Yes":
             #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs_clean.parquet")
 
-            with gzip.open(file_name + "_prepared_docs_clean.pkl.gz", 'wb') as file:
+            with gzip.open(file_name + "cleaned_prepared_docs.pkl.gz", 'wb') as file:
                 pickle.dump(doc_sections, file)
 
             #pd.Series(doc_sections).to_pickle(file_name + "_prepared_docs_clean.pkl")
         print("Documents saved to file.")
 
     return doc_sections, "Finished preparing documents."
-
 
 def document_to_dataframe(documents):
     '''
@@ -429,12 +338,3 @@ def document_to_dataframe(documents):
     # Create a DataFrame from the list of rows
     df = pd.DataFrame(rows)
     return df
-
-# Example usage
-#documents = [
-#    Document(page_content="Example content 1", metadata={"author": "Author 1", "year": 2021}),
-#    Document(page_content="Example content 2", metadata={"author": "Author 2", "year": 2022})
-#]
-
-#df = document_to_dataframe(documents)
-#df
