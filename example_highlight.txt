@@ -1,0 +1,10 @@
+# Sample DataFrame
+data = {
+    'Column1': ['This is a specific substring example', 'Another example', 'One more'],
+    'Column2': ['Some data', 'Another data', 'More data']
+}
+df = pd.DataFrame(data)
+
+# Define the column to highlight and the substrings to highlight
+column_to_highlight = 'Column1'
+substrings_to_highlight = ['specific', 'example']

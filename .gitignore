@@ -15,6 +15,7 @@
 *.npz
 *.pkl
 *.pkl.gz
+*.pem
 build/*
 dist/*
 __pycache__/*

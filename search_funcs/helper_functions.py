@@ -9,6 +9,12 @@ import gzip
 import pickle
 import numpy as np
 
+# Openpyxl functions for output
+from openpyxl import Workbook
+from openpyxl.cell.text import InlineFont 
+from openpyxl.cell.rich_text import TextBlock, CellRichText
+from openpyxl.styles import Font
+
 # Attempt to delete content of gradio temp folder
 def get_temp_folder_path():
     username = getpass.getuser()
@@ -86,7 +92,7 @@ def read_file(filename):
 
     return file
 
-def initial_data_load(in_file, in_bm25_column):
+def initial_data_load(in_file):
     '''
     When file is loaded, update the column dropdown choices
     '''
@@ -107,7 +113,7 @@ def initial_data_load(in_file, in_bm25_column):
     if not data_file_names:
         out_message = "Please load in at least one csv/Excel/parquet data file."
         print(out_message)
-        return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), bm25_load, out_message
+        return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), index_load, out_message
 
     data_file_name = data_file_names[0]
 
@@ -179,7 +185,7 @@ def put_columns_in_join_df(in_file):
         
     return gr.Dropdown(choices=concat_choices), new_df, out_message
 
-def dummy_function(gradio_component):
+
     """
     A dummy function that exists just so that dropdown updates work correctly.
     """
@@ -188,3 +194,109 @@ def dummy_function(gradio_component):
 def display_info(info_component):
     gr.Info(info_component)
 
+def highlight_found_text(search_text: str, full_text: str) -> str:
+    """
+    Highlights occurrences of search_text within full_text.
+    
+    Parameters:
+    - search_text (str): The text to be searched for within full_text.
+    - full_text (str): The text within which search_text occurrences will be highlighted.
+    
+    Returns:
+    - str: A string with occurrences of search_text highlighted.
+    
+    Example:
+    >>> highlight_found_text("world", "Hello, world! This is a test. Another world awaits.")
+    'Hello, <mark style="color:black;">world</mark>! This is a test. Another <mark style="color:black;">world</mark> awaits.'
+    """
+
+    def extract_text_from_input(text, i=0):
+        if isinstance(text, str):
+            return text
+        elif isinstance(text, list):
+            return text[i][0]
+        else:
+            return ""
+
+    def extract_search_text_from_input(text):
+        if isinstance(text, str):
+            return text
+        elif isinstance(text, list):
+            return text[-1][1]
+        else:
+            return ""
+
+    full_text = extract_text_from_input(full_text)
+    search_text = extract_search_text_from_input(search_text)
+
+    sections = search_text.split(sep = " ")
+
+    found_positions = {}
+    for x in sections:
+        text_start_pos = 0
+        while text_start_pos != -1:
+            text_start_pos = full_text.find(x, text_start_pos)
+            if text_start_pos != -1:
+                found_positions[text_start_pos] = text_start_pos + len(x)
+                text_start_pos += 1
+
+    # Combine overlapping or adjacent positions
+    sorted_starts = sorted(found_positions.keys())
+    combined_positions = []
+    if sorted_starts:
+        current_start, current_end = sorted_starts[0], found_positions[sorted_starts[0]]
+        for start in sorted_starts[1:]:
+            if start <= (current_end + 10):
+                current_end = max(current_end, found_positions[start])
+            else:
+                combined_positions.append((current_start, current_end))
+                current_start, current_end = start, found_positions[start]
+        combined_positions.append((current_start, current_end))
+
+    # Construct pos_tokens
+    pos_tokens = []
+    prev_end = 0
+    for start, end in combined_positions:
+        if end-start > 1: # Only combine if there is a significant amount of matched text. Avoids picking up single words like 'and' etc.
+            pos_tokens.append(full_text[prev_end:start])
+            pos_tokens.append('<mark style="color:black;">' + full_text[start:end] + '</mark>')
+            prev_end = end
+    pos_tokens.append(full_text[prev_end:])
+
+    return "".join(pos_tokens), combined_positions
+
+def create_rich_text_cell_from_positions(full_text, combined_positions):
+    # Construct pos_tokens
+    red = InlineFont(color='00FF0000')
+    rich_text_cell = CellRichText()
+
+    prev_end = 0
+    for start, end in combined_positions:
+        if end-start > 1: # Only combine if there is a significant amount of matched text. Avoids picking up single words like 'and' etc.
+            rich_text_cell.append(full_text[prev_end:start])
+            rich_text_cell.append(TextBlock(red, full_text[start:end]))
+            prev_end = end
+    rich_text_cell.append(full_text[prev_end:])
+
+    return rich_text_cell
+
+def create_highlighted_excel_wb(df, search_text, column_to_highlight):
+
+    # Create a new Excel workbook
+    wb = Workbook()
+    sheet = wb.active
+
+    # Insert headers into the worksheet, make bold
+    sheet.append(df.columns.tolist())
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+
+    # Find substrings in cells and highlight
+    for r_idx, row in enumerate(df.itertuples(), start=2):
+        for c_idx, cell_value in enumerate(row[1:], start=1):
+            sheet.cell(row=r_idx, column=c_idx, value=cell_value)
+            if df.columns[c_idx - 1] == column_to_highlight:
+                html_text, combined_positions = highlight_found_text(search_text, cell_value)
+                sheet.cell(row=r_idx, column=c_idx).value = create_rich_text_cell_from_positions(cell_value, combined_positions)
+
+    return wb

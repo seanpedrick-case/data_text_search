@@ -14,7 +14,7 @@ from datetime import datetime
 today_rev = datetime.now().strftime("%Y%m%d")
 
 from search_funcs.clean_funcs import initial_clean # get_lemma_tokens, stem_sentence
-from search_funcs.helper_functions import get_file_path_end_with_ext, get_file_path_end
+from search_funcs.helper_functions import get_file_path_end_with_ext, get_file_path_end, create_highlighted_excel_wb
 
 # Load the SpaCy model
 from spacy.cli.download import download
@@ -517,7 +517,10 @@ def bm25_search(free_text_query, in_no_search_results, original_data, text_colum
 	print("Saving search file output")
 	progress(0.7, desc = "Saving search output to file")
 
-	results_df_out.to_excel(results_df_name, index= None)
+	# Highlight found text and save to file
+	results_df_out_wb = create_highlighted_excel_wb(results_df_out, free_text_query, "search_text")
+	results_df_out_wb.save(results_df_name)
+	#results_df_out.to_excel(results_df_name, index= None)
 	results_first_text = results_df_out[text_column].iloc[0]
 
 	print("Returning results")
