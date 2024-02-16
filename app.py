@@ -35,9 +35,13 @@ with block:
     vec_weight = gr.State(1)
 
     corpus_state = gr.State()
-    keyword_data_state = gr.State(pd.DataFrame())
     keyword_data_list_state = gr.State([])
     join_data_state = gr.State(pd.DataFrame())
+
+    orig_keyword_data_state = gr.State(pd.DataFrame())
+    keyword_data_state = gr.State(pd.DataFrame())
+   
+    orig_semantic_data_state = gr.State(pd.DataFrame())
     semantic_data_state = gr.State(pd.DataFrame())
 
     in_k1_info = gr.State("""k1: Constant used for influencing the term frequency saturation. After saturation is reached, additional
@@ -157,12 +161,13 @@ depends on factors such as the type of documents or queries. Information taken f
     
     ### BM25 SEARCH ###
     # Update dropdowns upon initial file load
-    in_bm25_file.upload(initial_data_load, inputs=[in_bm25_file], outputs=[in_bm25_column, search_df_join_column, keyword_data_state, search_index_state, embeddings_state, tokenised_state, load_finished_message, current_source])
+    in_bm25_file.upload(initial_data_load, inputs=[in_bm25_file], outputs=[in_bm25_column, search_df_join_column, keyword_data_state, orig_keyword_data_state, search_index_state, embeddings_state, tokenised_state, load_finished_message, current_source])
     in_join_file.upload(put_columns_in_join_df, inputs=[in_join_file], outputs=[in_join_column, join_data_state, in_join_message])
  
     # Load in BM25 data
-    load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, keyword_data_state, tokenised_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, keyword_data_state, output_file, output_file, keyword_data_list_state]).\
+    load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, keyword_data_state, tokenised_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, keyword_data_state, output_file, output_file, keyword_data_list_state, in_bm25_column]).\
     then(fn=prepare_bm25, inputs=[corpus_state, in_bm25_file, in_bm25_column, search_index_state, in_clean_data, return_intermediate_files, in_k1, in_b, in_alpha], outputs=[load_finished_message, output_file])#.\
+    
     
     # BM25 search functions on click or enter
     keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword")
@@ -174,10 +179,10 @@ depends on factors such as the type of documents or queries. Information taken f
     ### SEMANTIC SEARCH ###
 
     # Load in a csv/excel file for semantic search
-    in_semantic_file.upload(initial_data_load, inputs=[in_semantic_file], outputs=[in_semantic_column,  search_df_join_column, semantic_data_state, search_index_state, embeddings_state, tokenised_state, semantic_load_progress, current_source_semantic])
+    in_semantic_file.upload(initial_data_load, inputs=[in_semantic_file], outputs=[in_semantic_column,  search_df_join_column,  semantic_data_state, orig_semantic_data_state, search_index_state, embeddings_state, tokenised_state, semantic_load_progress, current_source_semantic])
     load_semantic_data_button.click(
         csv_excel_text_to_docs, inputs=[semantic_data_state, in_semantic_file, in_semantic_column, in_clean_data, return_intermediate_files], outputs=[ingest_docs, semantic_load_progress]).\
-        then(docs_to_bge_embed_np_array, inputs=[ingest_docs, in_semantic_file, embeddings_state, return_intermediate_files, embedding_super_compress], outputs=[semantic_load_progress, vectorstore_state, semantic_output_file])
+        then(docs_to_bge_embed_np_array, inputs=[ingest_docs, in_semantic_file, embeddings_state, in_clean_data, return_intermediate_files, embedding_super_compress], outputs=[semantic_load_progress, vectorstore_state, semantic_output_file])
     
     # Semantic search query
     semantic_submit.click(bge_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, semantic_min_distance, vec_weight, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic")

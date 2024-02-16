@@ -32,68 +32,27 @@ num_pattern_regex = r'[0-9]+'
 postcode_pattern_regex = r'(\b(?:[A-Z][A-HJ-Y]?[0-9][0-9A-Z]? ?[0-9][A-Z]{2})|((GIR ?0A{2})\b$)|(?:[A-Z][A-HJ-Y]?[0-9][0-9A-Z]? ?[0-9]{1}?)$)|(\b(?:[A-Z][A-HJ-Y]?[0-9][0-9A-Z]?)\b$)'
 warning_pattern_regex = r'caution: this email originated from outside of the organization. do not click links or open attachments unless you recognize the sender and know the content is safe.'
 nbsp_pattern_regex = r'&nbsp;'
+multiple_spaces_regex = r'\s{2,}'
 
 # Pre-compiling the regular expressions for efficiency
-email_start_pattern = re.compile(email_start_pattern_regex)
-email_end_pattern = re.compile(email_end_pattern_regex)
-html_pattern = re.compile(html_pattern_regex)
-email_pattern = re.compile(email_end_pattern_regex)
-num_pattern = re.compile(num_pattern_regex)
-postcode_pattern = re.compile(postcode_pattern_regex)
-warning_pattern = re.compile(warning_pattern_regex)
-nbsp_pattern = re.compile(nbsp_pattern_regex)
+# email_start_pattern = re.compile(email_start_pattern_regex)
+# email_end_pattern = re.compile(email_end_pattern_regex)
+# html_pattern = re.compile(html_pattern_regex)
+# email_pattern = re.compile(email_end_pattern_regex)
+# num_pattern = re.compile(num_pattern_regex)
+# postcode_pattern = re.compile(postcode_pattern_regex)
+# warning_pattern = re.compile(warning_pattern_regex)
+# nbsp_pattern = re.compile(nbsp_pattern_regex)
 
-# def stem_sentence(sentence):
-
-#     words = sentence.split()
-#     stemmed_words = [stemmer.stem(word).lower().rstrip("'") for word in words]
-#     return stemmed_words
-
-# def stem_sentences(sentences, progress=gr.Progress()):
-#         """Stem each sentence in a list of sentences."""
-#         stemmed_sentences = [stem_sentence(sentence) for sentence in progress.tqdm(sentences)]
-#         return stemmed_sentences
-
-# def get_lemma_text(text):
-#     # Tokenize the input string into words
-#     tokens = word_tokenize(text)
-    
-#     lemmas = []
-#     for word in tokens:
-#         if len(word) > 3:
-#             lemma = wn.morphy(word)
-#         else:
-#             lemma = None
-        
-#         if lemma is None:
-#             lemmas.append(word)
-#         else:
-#             lemmas.append(lemma)
-#     return lemmas
-
-# def get_lemma_tokens(tokens):
-    # Tokenize the input string into words
-    
-    # lemmas = []
-    # for word in tokens:
-    #     if len(word) > 3:
-    #         lemma = wn.morphy(word)
-    #     else:
-    #         lemma = None
-        
-    #     if lemma is None:
-    #         lemmas.append(word)
-    #     else:
-    #         lemmas.append(lemma)
-    # return lemmas
 
 def initial_clean(texts , progress=gr.Progress()):
     texts = pl.Series(texts)#[]
 
-    text = texts.str.replace_all(email_start_pattern_regex, '')
+    text = texts.str.replace_all(html_pattern_regex, '')
+    text = text.str.replace_all(email_start_pattern_regex, '')
     text = text.str.replace_all(email_end_pattern_regex, '')
-    text = text.str.replace_all(html_pattern_regex, '')
     text = text.str.replace_all(email_pattern_regex, '')
+    text = text.str.replace_all(multiple_spaces_regex, ' ')
 
     text = text.to_list()
     

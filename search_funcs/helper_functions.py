@@ -13,7 +13,7 @@ import numpy as np
 from openpyxl import Workbook
 from openpyxl.cell.text import InlineFont 
 from openpyxl.cell.rich_text import TextBlock, CellRichText
-from openpyxl.styles import Font
+from openpyxl.styles import Font, Alignment
 
 # Attempt to delete content of gradio temp folder
 def get_temp_folder_path():
@@ -103,6 +103,7 @@ def initial_data_load(in_file):
     tokenised_load =[]
     out_message = ""
     current_source = ""
+    df = pd.DataFrame()
 
     file_list = [string.name for string in in_file]
 
@@ -113,25 +114,25 @@ def initial_data_load(in_file):
     if not data_file_names:
         out_message = "Please load in at least one csv/Excel/parquet data file."
         print(out_message)
-        return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), index_load, out_message
+        return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), pd.DataFrame(), index_load, out_message
 
-    data_file_name = data_file_names[0]
+    # This if you have loaded in a documents object for the semantic search
+    if "pkl" in data_file_names[0]: 
+        df = read_file(data_file_names[0])
+        new_choices = list(df[0].metadata.keys()) #["Documents"] #["page_contents"] + 
+        current_source = get_file_path_end_with_ext(data_file_names[0])
 
-    current_source = get_file_path_end_with_ext(data_file_name)
-   
-    
-    df = read_file(data_file_name)
+    # This if you have loaded in a csv/parquets/xlsx
+    else:
+        for file in data_file_names:
 
-    if "pkl" not in data_file_name:
+            current_source = current_source + get_file_path_end_with_ext(file) + " "
+        
+            df_new = read_file(file)
+
+            df = pd.concat([df, df_new], ignore_index = True)
 
         new_choices = list(df.columns)
-
-    elif "search_index" in data_file_name:
-        # If only the search_index found, need a data file too
-        new_choices = []
-
-    else: new_choices = ["page_contents"] + list(df[0].metadata.keys()) #["Documents"]
-    #print(new_choices)
 
     concat_choices.extend(new_choices)
 
@@ -161,7 +162,7 @@ def initial_data_load(in_file):
     out_message = "Initial data check successful. Next, choose a data column to search in the drop down above, then click 'Load data'"
     print(out_message)
         
-    return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), df, index_load, embed_load, tokenised_load, out_message, current_source
+    return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), df, df, index_load, embed_load, tokenised_load, out_message, current_source
 
 def put_columns_in_join_df(in_file):
     '''
@@ -291,12 +292,19 @@ def create_highlighted_excel_wb(df, search_text, column_to_highlight):
     for cell in sheet[1]:
         cell.font = Font(bold=True)
 
+    column_width = 150  # Adjust as needed
+    relevant_column_no = (df.columns == column_to_highlight).argmax() + 1
+    print(relevant_column_no)
+    sheet.column_dimensions[sheet.cell(row=1, column=relevant_column_no).column_letter].width = column_width
+
     # Find substrings in cells and highlight
     for r_idx, row in enumerate(df.itertuples(), start=2):
         for c_idx, cell_value in enumerate(row[1:], start=1):
             sheet.cell(row=r_idx, column=c_idx, value=cell_value)
             if df.columns[c_idx - 1] == column_to_highlight:
+
                 html_text, combined_positions = highlight_found_text(search_text, cell_value)
                 sheet.cell(row=r_idx, column=c_idx).value = create_rich_text_cell_from_positions(cell_value, combined_positions)
+                sheet.cell(row=r_idx, column=c_idx).alignment = Alignment(wrap_text=True)
 
     return wb

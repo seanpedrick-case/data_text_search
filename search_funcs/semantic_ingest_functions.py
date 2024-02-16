@@ -309,7 +309,7 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         elif clean == "Yes":
             #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs_clean.parquet")
 
-            with gzip.open(file_name + "cleaned_prepared_docs.pkl.gz", 'wb') as file:
+            with gzip.open(file_name + "_cleaned_prepared_docs.pkl.gz", 'wb') as file:
                 pickle.dump(doc_sections, file)
 
             #pd.Series(doc_sections).to_pickle(file_name + "_prepared_docs_clean.pkl")

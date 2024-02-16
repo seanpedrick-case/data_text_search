@@ -25,7 +25,7 @@ else:
 
 print("Device used is: ", torch_device)
 
-#from search_funcs.helper_functions import get_file_path_end
+from search_funcs.helper_functions import create_highlighted_excel_wb
 
 PandasDataFrame = Type[pd.DataFrame]
 
@@ -45,106 +45,10 @@ PandasDataFrame = Type[pd.DataFrame]
 embeddings_name = "BAAI/bge-small-en-v1.5"
 local_embeddings_location = "model/bge/"
 
-#try:
-#    tokenizer = AutoTokenizer.from_pretrained(embeddings_name)
-#    embeddings_model = AutoModel.from_pretrained(local_embeddings_location, local_files_only=True).to(torch_device)
-#except:
-#    tokenizer = AutoTokenizer.from_pretrained(embeddings_name)
-#    embeddings_model = AutoModel.from_pretrained(embeddings_name).to(torch_device)
-
 # Not using SentenceTransformer here
 embeddings_model = SentenceTransformer(embeddings_name)
     
-# def calc_bge_norm_embeddings(docs, embeddings_model=embeddings_model, tokenizer=tokenizer, progress=gr.Progress(track_tqdm=True)):
-#     # Tokenize sentences
-#     print("Tokenising")
-#     encoded_input = tokenizer(docs, padding=True, truncation=True, return_tensors='pt', max_length=32).to(torch_device)
-
-#     # Compute token embeddings
-#     print("Calculating embeddings")
-#     with torch.no_grad():
-#         model_output = embeddings_model(**encoded_input).to(torch_device)
-#         # Perform pooling. In this case, cls pooling.
-#         embeddings_out = model_output[0][:, 0]
-#     # normalize embeddings
-#     embeddings_out = torch.nn.functional.normalize(embeddings_out, p=2, dim=1)
-#     #print("Sentence embeddings:", embeddings_out)
-
-#     return embeddings_out
-
-
-def docs_to_jina_embed_np_array(docs_out, in_file, embeddings_state, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings = embeddings_model, progress=gr.Progress(track_tqdm=True)):
-    '''
-    Takes a Langchain document class and saves it into a Chroma sqlite file.
-    '''
-    if not in_file:
-        out_message = "No input file found. Please load in at least one file."
-        print(out_message)
-        return out_message, None, None
-        
-
-    progress(0.6, desc = "Loading/creating embeddings")
-
-    print(f"> Total split documents: {len(docs_out)}")
-
-    #print(docs_out)
-
-    page_contents = [doc.page_content for doc in docs_out]
-
-    ## Load in pre-embedded file if exists
-    file_list = [string.name for string in in_file]
-
-    #print(file_list)
-
-    embeddings_file_names = [string for string in file_list if "embedding" in string.lower()]
-    data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower()]# and "gz" not in string.lower()]
-    data_file_name = data_file_names[0]
-    data_file_name_no_ext = get_file_path_end(data_file_name)
-
-    out_message = "Document processing complete. Ready to search."
-
-     # print("embeddings loaded: ", embeddings_out)
-
-    if embeddings_state.size == 0:
-        tic = time.perf_counter()
-        print("Starting to embed documents.")
-        #embeddings_list = []
-        #for page in progress.tqdm(page_contents, desc = "Preparing search index", unit = "rows"):
-        #    embeddings_list.append(embeddings.encode(sentences=page, max_length=1024).tolist())
-
-        embeddings_out = embeddings.encode(sentences=page_contents, max_length=1024, show_progress_bar = True, batch_size = 32) # For Jina embeddings
-        #embeddings_list = embeddings.encode(sentences=page_contents, normalize_embeddings=True).tolist() # For BGE embeddings
-        #embeddings_list = embeddings.encode(sentences=page_contents).tolist() # For minilm
-
-        toc = time.perf_counter()
-        time_out = f"The embedding took {toc - tic:0.1f} seconds"
-        print(time_out)
-
-        # If you want to save your files for next time
-        if return_intermediate_files == "Yes":
-            progress(0.9, desc = "Saving embeddings to file")
-            if embeddings_super_compress == "No":
-                semantic_search_file_name = data_file_name_no_ext + '_' + 'embeddings.npz'
-                np.savez_compressed(semantic_search_file_name, embeddings_out)
-            else:
-                semantic_search_file_name = data_file_name_no_ext + '_' + 'embedding_compress.npz'
-                embeddings_out_round = np.round(embeddings_out, 3) 
-                embeddings_out_round *= 100 # Rounding not currently used
-                np.savez_compressed(semantic_search_file_name, embeddings_out_round)
-
-            return out_message, embeddings_out, semantic_search_file_name
-
-        return out_message, embeddings_out, None
-    else:
-        # Just return existing embeddings if already exist
-        embeddings_out = embeddings_state
-    
-    print(out_message)
-
-    return out_message, embeddings_out, None#, None
-
-
-def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings_model = embeddings_model, progress=gr.Progress(track_tqdm=True)):
+def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, clean, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings_model = embeddings_model, progress=gr.Progress(track_tqdm=True)):
     '''
     Takes a Langchain document class and saves it into a Chroma sqlite file.
     '''
@@ -197,6 +101,9 @@ def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, return_inter
 
         # If you want to save your files for next time
         if return_intermediate_files == "Yes":
+            if clean == "Yes": data_file_name_no_ext = data_file_name_no_ext + "_cleaned"
+            else: data_file_name_no_ext = data_file_name_no_ext
+
             progress(0.9, desc = "Saving embeddings to file")
             if embeddings_super_compress == "No":
                 semantic_search_file_name = data_file_name_no_ext + '_bge_embeddings.npz'
@@ -273,7 +180,7 @@ def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_c
     # Concatenate the original DataFrame with the expanded metadata DataFrame
     results_df_out = pd.concat([length_more_limit.drop('metadatas', axis=1), df_metadata_expanded], axis=1)
 
-    results_df_out = results_df_out.rename(columns={"documents":orig_df_col})
+    results_df_out = results_df_out.rename(columns={"documents":"search_text"})
 
     results_df_out = results_df_out.drop(["page_section", "row", "source", "id"], axis=1, errors="ignore")
     results_df_out['distances'] = round(results_df_out['distances'].astype(float), 3)
@@ -371,7 +278,11 @@ def bge_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_va
     print("Saving search output to file")
     progress(0.7, desc = "Saving search output to file")
 
-    results_df_out.to_excel(results_df_name, index= None)
+    # Highlight found text and save to file
+    results_df_out_wb = create_highlighted_excel_wb(results_df_out, query_str, "search_text")
+    results_df_out_wb.save(results_df_name)
+
+    #results_df_out.to_excel(results_df_name, index= None)
     results_first_text = results_df_out.iloc[0, 1]
 
     print("Returning results")
@@ -379,7 +290,77 @@ def bge_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_va
     return results_first_text, results_df_name
 
 
-def jina_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_val:int, out_passages:int,
+def docs_to_jina_embed_np_array_deprecated(docs_out, in_file, embeddings_state, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings = embeddings_model, progress=gr.Progress(track_tqdm=True)):
+    '''
+    Takes a Langchain document class and saves it into a Chroma sqlite file.
+    '''
+    if not in_file:
+        out_message = "No input file found. Please load in at least one file."
+        print(out_message)
+        return out_message, None, None
+        
+
+    progress(0.6, desc = "Loading/creating embeddings")
+
+    print(f"> Total split documents: {len(docs_out)}")
+
+    #print(docs_out)
+
+    page_contents = [doc.page_content for doc in docs_out]
+
+    ## Load in pre-embedded file if exists
+    file_list = [string.name for string in in_file]
+
+    #print(file_list)
+
+    embeddings_file_names = [string for string in file_list if "embedding" in string.lower()]
+    data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower()]# and "gz" not in string.lower()]
+    data_file_name = data_file_names[0]
+    data_file_name_no_ext = get_file_path_end(data_file_name)
+
+    out_message = "Document processing complete. Ready to search."
+
+     # print("embeddings loaded: ", embeddings_out)
+
+    if embeddings_state.size == 0:
+        tic = time.perf_counter()
+        print("Starting to embed documents.")
+        #embeddings_list = []
+        #for page in progress.tqdm(page_contents, desc = "Preparing search index", unit = "rows"):
+        #    embeddings_list.append(embeddings.encode(sentences=page, max_length=1024).tolist())
+
+        embeddings_out = embeddings.encode(sentences=page_contents, max_length=1024, show_progress_bar = True, batch_size = 32) # For Jina embeddings
+        #embeddings_list = embeddings.encode(sentences=page_contents, normalize_embeddings=True).tolist() # For BGE embeddings
+        #embeddings_list = embeddings.encode(sentences=page_contents).tolist() # For minilm
+
+        toc = time.perf_counter()
+        time_out = f"The embedding took {toc - tic:0.1f} seconds"
+        print(time_out)
+
+        # If you want to save your files for next time
+        if return_intermediate_files == "Yes":
+            progress(0.9, desc = "Saving embeddings to file")
+            if embeddings_super_compress == "No":
+                semantic_search_file_name = data_file_name_no_ext + '_' + 'embeddings.npz'
+                np.savez_compressed(semantic_search_file_name, embeddings_out)
+            else:
+                semantic_search_file_name = data_file_name_no_ext + '_' + 'embedding_compress.npz'
+                embeddings_out_round = np.round(embeddings_out, 3) 
+                embeddings_out_round *= 100 # Rounding not currently used
+                np.savez_compressed(semantic_search_file_name, embeddings_out_round)
+
+            return out_message, embeddings_out, semantic_search_file_name
+
+        return out_message, embeddings_out, None
+    else:
+        # Just return existing embeddings if already exist
+        embeddings_out = embeddings_state
+    
+    print(out_message)
+
+    return out_message, embeddings_out, None#, None
+
+def jina_simple_retrieval_deprecated(query_str:str, vectorstore, docs, orig_df_col:str, k_val:int, out_passages:int,
                            vec_score_cut_off:float, vec_weight:float, in_join_file, in_join_column = None, search_df_join_column = None, device = torch_device, embeddings = embeddings_model, progress=gr.Progress(track_tqdm=True)): # ,vectorstore, embeddings
 
     # print("vectorstore loaded: ", vectorstore)
@@ -463,6 +444,7 @@ def jina_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_v
 
 #if os.path.isfile(chromadb_file):
 #    os.remove(chromadb_file)
+
 
 def docs_to_chroma_save_deprecated(docs_out, embeddings = embeddings_model, progress=gr.Progress()):
     '''

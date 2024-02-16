@@ -231,11 +231,11 @@ class BM25:
 # These following functions are my own work
 
 def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, clean="No",  return_intermediate_files = "No", progress=gr.Progress(track_tqdm=True)):
-	print(in_file)
+	#print(in_file)
 
 	if not in_file:
 		print("No input file found. Please load in at least one file.")
-		return None, "No input file found. Please load in at least one file.", data_state, None, None, None, []
+		return None, "No input file found. Please load in at least one file.", data_state, None, None, [], gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
 	progress(0, desc = "Loading in data")
 	file_list = [string.name for string in in_file]
@@ -245,10 +245,10 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 	data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "gz" not in string.lower()]
 
 	if not data_file_names:
-		return None, "Please load in at least one csv/Excel/parquet data file.", data_state, None, None, None, []
+		return None, "Please load in at least one csv/Excel/parquet data file.", data_state, None, None, [], gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
 	if not text_column:
-		return None, "Please enter a column name to search.", data_state, None, None, None, []
+		return None, "Please enter a column name to search.", data_state, None, None,[], gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
 	data_file_name = data_file_names[0]
 
@@ -268,7 +268,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 		corpus = list(df[text_column])
 		message = "Tokenisation skipped - loading search index from file."
 		print(message)
-		return corpus, message, df, None, None, None
+		return corpus, message, df, None, None, [], gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
 	
 	
@@ -282,7 +282,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 		df_list = initial_clean(df_list)
 
 		# Save to file if you have cleaned the data
-		out_file_name, text_column = save_prepared_bm25_data(data_file_name, df_list, df, text_column)
+		out_file_name, text_column, df  = save_prepared_bm25_data(data_file_name, df_list, df, text_column)
 	
 		clean_toc = time.perf_counter()
 		clean_time_out = f"Cleaning the text took {clean_toc - clean_tic:0.1f} seconds."
@@ -328,9 +328,9 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 
 		pd.DataFrame(data={"Corpus":corpus}).to_parquet(tokenised_data_file_name)
 
-		return corpus, message, df, out_file_name, tokenised_data_file_name, df_list
+		return corpus, message, df, out_file_name, tokenised_data_file_name, df_list, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
-	return corpus, message, df, out_file_name, None, df_list
+	return corpus, message, df, out_file_name, None, df_list, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
 def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_column, progress=gr.Progress(track_tqdm=True)):
 
@@ -356,7 +356,7 @@ def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_col
 		prepared_df.to_parquet(file_name)
 	else: file_name = None
 
-	return file_name, new_text_column
+	return file_name, new_text_column, prepared_df
 
 def prepare_bm25(corpus, in_file, text_column, search_index, clean, return_intermediate_files, k1=1.5, b = 0.75, alpha=-5, progress=gr.Progress(track_tqdm=True)):
 	#bm25.save("saved_df_bm25")
