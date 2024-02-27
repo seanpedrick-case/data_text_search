@@ -197,8 +197,11 @@ def parse_metadata(row):
 
 def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_intermediate_files = "No", chunk_size=None, progress=gr.Progress(track_tqdm=True)) -> List[Document]:
     """Converts a DataFrame's content to a list of dictionaries in the 'Document' format, containing page_content and associated metadata."""
+
+    output_list = []
+
     if not in_file:
-        return None, "Please load in at least one file.", df, None, None, None
+        return None, "Please load in at least one file.", output_list
 
     progress(0, desc = "Loading in data")
     
@@ -207,10 +210,10 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
     data_file_names = [string for string in file_list if "tokenised" not in string and "npz" not in string.lower()]
 
     if not data_file_names:
-        return doc_sections, "Please load in at least one csv/Excel/parquet data file."
+        return doc_sections, "Please load in at least one csv/Excel/parquet data file.", output_list
 
     if not text_column:
-        return None, "Please enter a column name to search", df, None, None, None
+        return None, "Please enter a column name to search"
 
     data_file_name = data_file_names[0]
 
@@ -229,7 +232,7 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         # Convert each element in the Series to a Document instance
         #doc_sections = section_series.apply(lambda x: Document(**x))
 
-        return doc_sections, "Finished preparing documents"
+        return doc_sections, "Finished preparing documents", output_list
     #    df = document_to_dataframe(df.iloc[:,0])
 
     ingest_tic = time.perf_counter()
@@ -255,7 +258,7 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         
 
         # Save to file if you have cleaned the data. Text column has now been renamed with '_cleaned' at the send
-        out_file_name, text_column = save_prepared_bm25_data(data_file_name, df_list, df, text_column)
+        out_file_name, text_column, df = save_prepared_bm25_data(data_file_name, df_list, df, text_column)
 
         df[text_column] = df_list
 
@@ -301,21 +304,23 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
 
         if clean == "No":
             #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs.parquet")
-
-            with gzip.open(file_name + "_prepared_docs.pkl.gz", 'wb') as file:
+            out_doc_file_name = file_name + "_prepared_docs.pkl.gz"
+            with gzip.open(out_doc_file_name, 'wb') as file:
                 pickle.dump(doc_sections, file)
 
             #pd.Series(doc_sections).to_pickle(file_name + "_prepared_docs.pkl")
         elif clean == "Yes":
             #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs_clean.parquet")
 
-            with gzip.open(file_name + "_cleaned_prepared_docs.pkl.gz", 'wb') as file:
+            out_doc_file_name = file_name + "_cleaned_prepared_docs.pkl.gz"
+            with gzip.open(out_doc_file_name, 'wb') as file:
                 pickle.dump(doc_sections, file)
 
             #pd.Series(doc_sections).to_pickle(file_name + "_prepared_docs_clean.pkl")
+        output_list.append(out_doc_file_name)
         print("Documents saved to file.")
 
-    return doc_sections, "Finished preparing documents."
+    return doc_sections, "Finished preparing documents.", output_list
 
 def document_to_dataframe(documents):
     '''

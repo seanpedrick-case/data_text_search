@@ -14,7 +14,7 @@ NOTE: for ensuring that spaCy models are loaded into the program correctly in re
 
 9.Run the following, assuming you want to make one single .exe file (This helped me: https://github.com/pyinstaller/pyinstaller/issues/8108):
 
-a) In command line: pyi-makespec --additional-hooks-dir="build_deps\\" --collect-data=gradio_client --collect-data=gradio --hidden-import pyarrow.vendored.version --onefile --name DataSearchApp_0.2.3 app.py
+a) In command line: pyi-makespec --additional-hooks-dir="build_deps\\" --collect-data=gradio_client --collect-data=gradio --hidden-import pyarrow.vendored.version --onefile --name DataSearchApp_0.3 app.py
 
 b) Open the created spec file in Notepad. Add the following to the end of the Analysis section then save:
 
@@ -25,7 +25,7 @@ a = Analysis(
     }
 )
 
-c) Back in command line, run this: pyinstaller --clean --noconfirm DataSearchApp_0.2.3.spec
+c) Back in command line, run this: pyinstaller --clean --noconfirm DataSearchApp_0.3.spec
 
 
 9. A 'dist' folder will be created with the executable inside along with all dependencies('dist\data_text_search'). 

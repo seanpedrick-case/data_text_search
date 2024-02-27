@@ -264,13 +264,16 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 
 	df[text_column] = df[text_column].astype(str).str.lower()
 
+	if "copy_of_case_note_id" in df.columns:
+		print("copy column found")
+		df.loc[~df["copy_of_case_note_id"].isna(), text_column] = ""
+
 	if search_index_file_names:
 		corpus = list(df[text_column])
 		message = "Tokenisation skipped - loading search index from file."
 		print(message)
 		return corpus, message, df, None, None, [], gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
-	
 	
 	if clean == "Yes":
 		progress(0.1, desc = "Cleaning data")
@@ -466,7 +469,7 @@ def convert_bm25_query_to_tokens(free_text_query, clean="No"):
 
     return out_query
 
-def bm25_search(free_text_query, in_no_search_results, original_data, text_column, in_join_file, clean = "No",  in_join_column = "", search_df_join_column = "", progress=gr.Progress(track_tqdm=True)):   
+def bm25_search(free_text_query, in_no_search_results, original_data, searched_data, text_column, in_join_file, clean,  in_join_column = "", search_df_join_column = "", progress=gr.Progress(track_tqdm=True)):   
 
 	progress(0, desc = "Conducting keyword search")
 	
@@ -493,8 +496,37 @@ def bm25_search(free_text_query, in_no_search_results, original_data, text_colum
 									"search_text": joined_texts,
 									"search_score_abs": results_scores})
 	results_df['search_score_abs'] = abs(round(results_df['search_score_abs'], 2))
-	results_df_out = results_df[['index', 'search_text', 'search_score_abs']].merge(original_data,left_on="index", right_index=True, how="left")#.drop("index", axis=1)
 
+	# Join scores onto searched data
+	results_df_out = results_df[['index', 'search_text', 'search_score_abs']].merge(searched_data,left_on="index", right_index=True, how="left", suffixes = ("", "_y")).drop("index_y", axis=1, errors="ignore")
+
+	
+
+	# Join on data from duplicate case notes
+	if ("copy_of_case_note_id" in original_data.columns) and ("note_id" in results_df_out.columns):
+		if clean == "No":
+			print("Clean is no")
+			orig_text_column = text_column
+		else:
+			print("Clean is yes")
+			orig_text_column = text_column.replace("_cleaned", "")
+
+		#print(orig_text_column)
+		#print(original_data.columns)
+
+		original_data["original_note_id"] = original_data["copy_of_case_note_id"]
+		original_data["original_note_id"] = original_data["original_note_id"].combine_first(original_data["note_id"])
+
+		results_df_out = results_df_out.merge(original_data[["original_note_id", "note_id", "copy_of_case_note_id", "person_id"]],left_on="note_id", right_on="original_note_id", how="left", suffixes=("_primary", "")) # .drop(orig_text_column, axis = 1)
+		results_df_out.loc[~results_df_out["copy_of_case_note_id"].isnull(), "search_text"] = ""
+		results_df_out.loc[~results_df_out["copy_of_case_note_id"].isnull(), text_column] = ""
+
+		#results_df_out = pd.concat([results_df_out, original_data[~original_data["copy_of_case_note_id"].isna()][["copy_of_case_note_id", "person_id"]]])
+		# Replace NaN with an empty string
+		# results_df_out.fillna('', inplace=True)
+		
+		
+	
 	# Join on additional files
 	if not in_join_file.empty:
 		progress(0.5, desc = "Joining on additional data file")
@@ -507,8 +539,8 @@ def bm25_search(free_text_query, in_no_search_results, original_data, text_colum
 
 		results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left", suffixes=('','_y'))#.drop(in_join_column, axis=1)
 
-	# Reorder results by score
-	results_df_out = results_df_out.sort_values('search_score_abs', ascending=False)
+	# Reorder results by score, and whether there is text
+	results_df_out = results_df_out.sort_values(['search_score_abs', "search_text"], ascending=False)	
 
 	# Out file
 	query_str_file = ("_").join(token_query)

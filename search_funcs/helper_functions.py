@@ -110,6 +110,7 @@ def initial_data_load(in_file):
     #print(file_list)
 
     data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "search_index" not in string.lower()]
+    print(data_file_names)
 
     if not data_file_names:
         out_message = "Please load in at least one csv/Excel/parquet data file."

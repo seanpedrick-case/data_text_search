@@ -37,6 +37,7 @@ with block:
     corpus_state = gr.State()
     keyword_data_list_state = gr.State([])
     join_data_state = gr.State(pd.DataFrame())
+    output_file_state = gr.State([])
 
     orig_keyword_data_state = gr.State(pd.DataFrame())
     keyword_data_state = gr.State(pd.DataFrame())
@@ -122,7 +123,7 @@ depends on factors such as the type of documents or queries. Information taken f
     with gr.Tab(label="Advanced options"):
         with gr.Accordion(label="Data load / save options", open = True):
             with gr.Row():
-                in_clean_data = gr.Dropdown(label = "Clean text during load (remove html tags). For large files this may take some time!", value="No", choices=["Yes", "No"])
+                in_clean_data = gr.Dropdown(label = "Clean text during load (remove html tags). For large files this may take some time!", value="Yes", choices=["Yes", "No"])
                 return_intermediate_files = gr.Dropdown(label = "Return intermediate processing files from file preparation. Files can be loaded in to save processing time in future.", value="No", choices=["Yes", "No"])
                 embedding_super_compress = gr.Dropdown(label = "Round embeddings to three dp for smaller files with less accuracy.", value="Yes", choices=["Yes", "No"])
             #save_clean_data_button = gr.Button(value = "Save loaded data to file", scale = 1)
@@ -170,8 +171,8 @@ depends on factors such as the type of documents or queries. Information taken f
     
     
     # BM25 search functions on click or enter
-    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword")
-    keyword_query.submit(fn=bm25_search, inputs=[keyword_query, in_no_search_results, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file])
+    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, orig_keyword_data_state, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword")
+    keyword_query.submit(fn=bm25_search, inputs=[keyword_query, in_no_search_results, orig_keyword_data_state, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file])
 
     # Fuzzy search functions on click
     fuzzy_search_button.click(fn=spacy_fuzzy_search, inputs=[keyword_query, keyword_data_list_state, keyword_data_state, in_bm25_column, join_data_state, search_df_join_column, in_join_column, no_spelling_mistakes], outputs=[output_single_text, output_file], api_name="fuzzy")
@@ -181,8 +182,8 @@ depends on factors such as the type of documents or queries. Information taken f
     # Load in a csv/excel file for semantic search
     in_semantic_file.upload(initial_data_load, inputs=[in_semantic_file], outputs=[in_semantic_column,  search_df_join_column,  semantic_data_state, orig_semantic_data_state, search_index_state, embeddings_state, tokenised_state, semantic_load_progress, current_source_semantic])
     load_semantic_data_button.click(
-        csv_excel_text_to_docs, inputs=[semantic_data_state, in_semantic_file, in_semantic_column, in_clean_data, return_intermediate_files], outputs=[ingest_docs, semantic_load_progress]).\
-        then(docs_to_bge_embed_np_array, inputs=[ingest_docs, in_semantic_file, embeddings_state, in_clean_data, return_intermediate_files, embedding_super_compress], outputs=[semantic_load_progress, vectorstore_state, semantic_output_file])
+        csv_excel_text_to_docs, inputs=[semantic_data_state, in_semantic_file, in_semantic_column, in_clean_data, return_intermediate_files], outputs=[ingest_docs, semantic_load_progress, output_file_state]).\
+        then(docs_to_bge_embed_np_array, inputs=[ingest_docs, in_semantic_file, embeddings_state, output_file_state, in_clean_data, return_intermediate_files, embedding_super_compress], outputs=[semantic_load_progress, vectorstore_state, semantic_output_file, output_file_state])
     
     # Semantic search query
     semantic_submit.click(bge_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, semantic_min_distance, vec_weight, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic")

@@ -48,14 +48,14 @@ local_embeddings_location = "model/bge/"
 # Not using SentenceTransformer here
 embeddings_model = SentenceTransformer(embeddings_name)
     
-def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, clean, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings_model = embeddings_model, progress=gr.Progress(track_tqdm=True)):
+def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, output_file_state, clean, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings_model = embeddings_model, progress=gr.Progress(track_tqdm=True)):
     '''
     Takes a Langchain document class and saves it into a Chroma sqlite file.
     '''
     if not in_file:
         out_message = "No input file found. Please load in at least one file."
         print(out_message)
-        return out_message, None, None
+        return out_message, None, None, output_file_state
         
 
     progress(0.6, desc = "Loading/creating embeddings")
@@ -114,16 +114,18 @@ def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, clean, retur
                 embeddings_out_round *= 100 # Rounding not currently used
                 np.savez_compressed(semantic_search_file_name, embeddings_out_round)
 
-            return out_message, embeddings_out, semantic_search_file_name
+            output_file_state.append(semantic_search_file_name)
 
-        return out_message, embeddings_out, None
+            return out_message, embeddings_out, output_file_state, output_file_state
+
+        return out_message, embeddings_out, output_file_state, output_file_state
     else:
         # Just return existing embeddings if already exist
         embeddings_out = embeddings_state
     
     print(out_message)
 
-    return out_message, embeddings_out, None#, None
+    return out_message, embeddings_out, output_file_state, output_file_state
 
 def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_cut_off, vec_weight, orig_df_col, in_join_column, search_df_join_column, progress = gr.Progress(track_tqdm=True)):
 

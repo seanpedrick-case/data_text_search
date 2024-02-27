@@ -7,6 +7,7 @@ import gradio as gr
 import pandas as pd
 from typing import List, Type
 from datetime import datetime
+from search_funcs.helper_functions import create_highlighted_excel_wb
 
 PandasDataFrame = Type[pd.DataFrame]
 
@@ -110,7 +111,12 @@ def spacy_fuzzy_search(string_query:str, df_list: List[str], original_data: Pand
     print("Saving search file output")
     progress(0.7, desc = "Saving search output to file")
 
-    results_df_out.to_excel(results_df_name, index= None)
+    #results_df_out.to_excel(results_df_name, index= None)
+
+    # Highlight found text and save to file
+    results_df_out_wb = create_highlighted_excel_wb(results_df_out, free_text_query, "search_text")
+    results_df_out_wb.save(results_df_name)
+    
     results_first_text = results_df_out[text_column].iloc[0]
 
     print("Returning results")
