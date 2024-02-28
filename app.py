@@ -190,7 +190,10 @@ depends on factors such as the type of documents or queries. Information taken f
     semantic_query.submit(bge_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, semantic_min_distance, vec_weight, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file])
 
 # Simple run for HF spaces or local on your computer
-block.queue().launch(debug=True) 
+#block.queue().launch(debug=True) 
+
+# Running on local server without specifying port
+block.queue().launch(server_name="0.0.0.0") 
 
 # Running on local server without https
 #block.queue().launch(server_name="0.0.0.0", server_port=7861, ssl_verify=False)

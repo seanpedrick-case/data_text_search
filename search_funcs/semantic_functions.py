@@ -43,10 +43,27 @@ PandasDataFrame = Type[pd.DataFrame]
 
 # Load embeddings
 embeddings_name = "BAAI/bge-small-en-v1.5"
-local_embeddings_location = "model/bge/"
 
-# Not using SentenceTransformer here
-embeddings_model = SentenceTransformer(embeddings_name)
+# Define a list of possible local locations to search for the model
+local_embeddings_locations = [
+    "model/bge/", # Potential local location
+    "/model/bge/", # Potential location in Docker container
+    "/home/user/app/model/bge/" # This is inside a Docker container
+]
+
+# Attempt to load the model from each local location
+for location in local_embeddings_locations:
+    try:
+        embeddings_model = SentenceTransformer(location)
+        print(f"Found local model installation at: {location}")
+        break  # Exit the loop if the model is found
+    except Exception as e:
+        print(f"Failed to load model from {location}: {e}")
+        continue
+else:
+    # If the loop completes without finding the model in any local location
+    embeddings_model = SentenceTransformer(embeddings_name)
+    print("Could not find local model installation. Downloading from Huggingface")
     
 def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, output_file_state, clean, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings_model = embeddings_model, progress=gr.Progress(track_tqdm=True)):
     '''

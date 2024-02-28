@@ -1,11 +1,24 @@
 # First stage: build dependencies
 FROM public.ecr.aws/docker/library/python:3.10.13-slim AS build
 
+# Install wget
+RUN apt-get update && apt-get install -y wget
+
+# Create a directory for the model
+RUN mkdir /model
+
 WORKDIR /src
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
+
+# Download the model during the build process
+RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
+RUN apt-get install git-lfs -y
+RUN git lfs install
+RUN git clone https://huggingface.co/BAAI/bge-small-en-v1.5 /model/bge
+RUN rm -rf /model/bge/.git
 
 # Second stage: final image
 FROM build AS final
