@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/python:3.10.13-slim
+FROM public.ecr.aws/docker/library/python:3.10.13-slim as build
 
 WORKDIR /src
 
