@@ -1,4 +1,5 @@
-FROM public.ecr.aws/docker/library/python:3.10.13-slim as build
+# First stage: build dependencies
+FROM public.ecr.aws/docker/library/python:3.10.13-slim AS build
 
 WORKDIR /src
 
@@ -6,10 +7,15 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Second stage: final image
+FROM build AS final
+
 # Set up a new user named "user" with user ID 1000
 RUN useradd -m -u 1000 user
+
 # Switch to the "user" user
 USER user
+
 # Set home to the user's home directory
 ENV HOME=/home/user \
 	PATH=/home/user/.local/bin:$PATH \
