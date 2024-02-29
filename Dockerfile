@@ -1,5 +1,5 @@
 # First stage: build dependencies
-FROM public.ecr.aws/docker/library/python:3.10.13-slim AS build
+FROM public.ecr.aws/docker/library/python:3.10.13-slim
 
 # Install wget
 RUN apt-get update && apt-get install -y wget
@@ -20,14 +20,11 @@ RUN git lfs install
 RUN git clone https://huggingface.co/BAAI/bge-small-en-v1.5 /model/bge
 RUN rm -rf /model/bge/.git
 
-# Second stage: final image
-FROM build AS final
-
 # Set up a new user named "user" with user ID 1000
-RUN useradd -m -u 1000 user
+#RUN useradd -m -u 1000 user
 
 # Switch to the "user" user
-USER user
+#USER user
 
 # Set home to the user's home directory
 ENV HOME=/home/user \
@@ -38,13 +35,14 @@ ENV HOME=/home/user \
 	GRADIO_NUM_PORTS=1 \
 	GRADIO_SERVER_NAME=0.0.0.0 \
 	GRADIO_THEME=huggingface \
-	GRADIO_ROOT_PATH=/data_text_search \
+	#GRADIO_ROOT_PATH=/data_text_search \
 	SYSTEM=spaces
  
 # Set the working directory to the user's home directory
 WORKDIR $HOME/app
 
 # Copy the current directory contents into the container at $HOME/app setting the owner to the user
-COPY --chown=user . $HOME/app
+#COPY --chown=user . $HOME/app
+COPY . $HOME/app
 
 CMD ["python", "app.py"]
