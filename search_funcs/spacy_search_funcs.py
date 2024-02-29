@@ -114,7 +114,7 @@ def spacy_fuzzy_search(string_query:str, df_list: List[str], original_data: Pand
     #results_df_out.to_excel(results_df_name, index= None)
 
     # Highlight found text and save to file
-    results_df_out_wb = create_highlighted_excel_wb(results_df_out, free_text_query, "search_text")
+    results_df_out_wb = create_highlighted_excel_wb(results_df_out, string_query, "search_text")
     results_df_out_wb.save(results_df_name)
     
     results_first_text = results_df_out[text_column].iloc[0]
