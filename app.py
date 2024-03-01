@@ -20,7 +20,7 @@ temp_folder_path = get_temp_folder_path()
 empty_folder(temp_folder_path)
 
 ## Gradio app - BM25 search
-block = gr.Blocks(theme = gr.themes.Base())
+block = gr.Blocks(theme = gr.themes.Base()) # , css="theme.css"
 
 
 with block:
@@ -197,7 +197,7 @@ depends on factors such as the type of documents or queries. Information taken f
 #block.queue().launch(debug=True) 
 
 # Running on local server without specifying port
-block.queue().launch(server_name="0.0.0.0")#, root_path="/data_text_search") 
+block.queue().launch(server_name="0.0.0.0", root_path="/data-text-search") # 
 
 #app = gr.mount_gradio_app(app, block, path="/data_text_search")
 
