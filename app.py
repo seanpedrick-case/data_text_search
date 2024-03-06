@@ -196,10 +196,9 @@ depends on factors such as the type of documents or queries. Information taken f
 # Simple run for HF spaces or local on your computer
 #block.queue().launch(debug=True) 
 
-# Running on local server without specifying port
-block.queue().launch(server_name="0.0.0.0", root_path="/data-text-search") # 
+# Running on server (e.g. AWS) without specifying port
+block.queue().launch() # root_path="/data-text-search" # server_name="0.0.0.0", 
 
-#app = gr.mount_gradio_app(app, block, path="/data_text_search")
 
 # Running on local server without https
 #block.queue().launch(server_name="0.0.0.0", server_port=7861, ssl_verify=False)
