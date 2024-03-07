@@ -197,7 +197,7 @@ depends on factors such as the type of documents or queries. Information taken f
 #block.queue().launch(debug=True) 
 
 # Running on server (e.g. AWS) without specifying port
-block.queue().launch() # root_path="/data-text-search" # server_name="0.0.0.0", 
+block.queue().launch(ssl_verify=False) # root_path="/data-text-search" # server_name="0.0.0.0", 
 
 
 # Running on local server without https
