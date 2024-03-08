@@ -36,7 +36,7 @@ ENV HOME=/home/user \
 	GRADIO_SERVER_NAME=0.0.0.0 \
 	GRADIO_SERVER_PORT=7860 \
 	GRADIO_THEME=huggingface \
-	GRADIO_ROOT_PATH=/data-text-search \
+	#GRADIO_ROOT_PATH=/data-text-search \
 	SYSTEM=spaces
  
 # Set the working directory to the user's home directory
