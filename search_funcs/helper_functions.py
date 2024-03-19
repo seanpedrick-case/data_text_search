@@ -15,6 +15,10 @@ from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl.styles import Font, Alignment
 
+megabyte = 1024 * 1024  # Bytes in a megabyte
+file_size_mb = 500  # Size in megabytes
+file_size_bytes_500mb =  megabyte * file_size_mb
+
 # Attempt to delete content of gradio temp folder
 def get_temp_folder_path():
     username = getpass.getuser()
@@ -115,7 +119,7 @@ def initial_data_load(in_file):
     if not data_file_names:
         out_message = "Please load in at least one csv/Excel/parquet data file."
         print(out_message)
-        return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), pd.DataFrame(), index_load, out_message
+        return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), pd.DataFrame(), index_load, embed_load, tokenised_load, out_message, None
 
     # This if you have loaded in a documents object for the semantic search
     if "pkl" in data_file_names[0]: 
@@ -129,6 +133,15 @@ def initial_data_load(in_file):
 
             current_source = current_source + get_file_path_end_with_ext(file) + " "
         
+            # Get the size of the file
+            print("Checking file size")
+            file_size = os.path.getsize(file)
+            if file_size > file_size_bytes_500mb:
+                out_message = "Data file greater than 500mb in size. Please use smaller sizes."
+                print(out_message)
+                return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), pd.DataFrame(), index_load, embed_load, tokenised_load, out_message, None
+
+
             df_new = read_file(file)
 
             df = pd.concat([df, df_new], ignore_index = True)

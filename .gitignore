@@ -16,6 +16,7 @@
 *.pkl
 *.pkl.gz
 *.pem
+*.json.out
 docs/*
 build/*
 dist/*
