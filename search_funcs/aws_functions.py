@@ -36,11 +36,13 @@ def get_assumed_role_info():
     
     return assumed_role_arn, assumed_role_name
 
-assumed_role_arn, assumed_role_name = get_assumed_role_info()
+try:
+    assumed_role_arn, assumed_role_name = get_assumed_role_info()
 
-print("Assumed Role ARN:", assumed_role_arn)
-print("Assumed Role Name:", assumed_role_name)
-
+    print("Assumed Role ARN:", assumed_role_arn)
+    print("Assumed Role Name:", assumed_role_name)
+except Exception as e:
+    print(e)
 
 # Download direct from S3 - requires login credentials
 def download_file_from_s3(bucket_name, key, local_file_path):
