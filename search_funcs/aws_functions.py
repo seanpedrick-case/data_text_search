@@ -106,60 +106,63 @@ def download_files_from_s3(bucket_name, s3_folder, local_folder, filenames):
 
 
 
-def load_data_from_aws(in_aws_keyword_file, bucket_name=bucket_name):
+def load_data_from_aws(in_aws_keyword_file, aws_password="", bucket_name=bucket_name):
 
     temp_dir = tempfile.mkdtemp()
     local_keyword_stub = temp_dir + '/keyword/'
     local_semantic_stub = temp_dir + '/semantic/'
 
     files = []
+    if aws_password:
+        if "Bioasq - Biomedical example data" in in_aws_keyword_file and aws_password == os.environ['BIOASQ_PASSWORD']:
 
-    if "Bioasq - Biomedical example data" in in_aws_keyword_file:
-
-        s3_folder_stub = 'example_data/bioasq/latest/'
-
-        if 'keyword' in in_aws_keyword_file:
-            s3_folder_stub = s3_folder_stub + 'keyword/'
-            local_folder_path = local_keyword_stub
-
-        if 'semantic' in in_aws_keyword_file:
-            s3_folder_stub = s3_folder_stub + 'semantic/'
-            local_folder_path = local_semantic_stub
-                  
-
-        # Check if folder exists
-        if not os.path.exists(local_folder_path):
-            print(f"Folder {local_folder_path} does not exist! Making folder.")
-
-            os.mkdir(local_folder_path)
-
-        # Check if folder is empty
-        if len(os.listdir(local_folder_path)) == 0:
-            print(f"Folder {local_folder_path} is empty")
+            s3_folder_stub = 'example_data/bioasq/latest/'
 
             if 'keyword' in in_aws_keyword_file:
-                # Download keyword folder
-                download_files_from_s3(bucket_name, s3_folder_stub, local_folder_path, filenames='*')
+                s3_folder_stub = s3_folder_stub + 'keyword/'
+                local_folder_path = local_keyword_stub
 
             if 'semantic' in in_aws_keyword_file:
-                # Download keyword folder
-                download_files_from_s3(bucket_name, s3_folder_stub, local_folder_path, filenames=['mini-bioasq-0000_cleaned_bge_embedding_compress.npz', 'mini-bioasq-0000_cleaned_prepared_docs.pkl.gz'])
+                s3_folder_stub = s3_folder_stub + 'semantic/'
+                local_folder_path = local_semantic_stub
+                    
 
-            print("AWS data downloaded")
+            # Check if folder exists
+            if not os.path.exists(local_folder_path):
+                print(f"Folder {local_folder_path} does not exist! Making folder.")
+
+                os.mkdir(local_folder_path)
+
+            # Check if folder is empty
+            if len(os.listdir(local_folder_path)) == 0:
+                print(f"Folder {local_folder_path} is empty")
+
+                if 'keyword' in in_aws_keyword_file:
+                    # Download keyword folder
+                    download_files_from_s3(bucket_name, s3_folder_stub, local_folder_path, filenames='*')
+
+                if 'semantic' in in_aws_keyword_file:
+                    # Download keyword folder
+                    download_files_from_s3(bucket_name, s3_folder_stub, local_folder_path, filenames=['mini-bioasq-0000_cleaned_bge_embedding_compress.npz', 'mini-bioasq-0000_cleaned_prepared_docs.pkl.gz'])
+
+                print("AWS data downloaded")
+
+            else:
+                print(f"Folder {local_folder_path} is not empty")
+
+            #files = os.listdir(local_folder_stub)
+            #print(files)
+
+            files = [os.path.join(local_folder_path, f) for f in os.listdir(local_folder_path) if os.path.isfile(os.path.join(local_folder_path, f))]
+
+            out_message = "Data successfully loaded from AWS"
+            print(out_message)
 
         else:
-            print(f"Folder {local_folder_path} is not empty")
-
-        #files = os.listdir(local_folder_stub)
-        #print(files)
-
-        files = [os.path.join(local_folder_path, f) for f in os.listdir(local_folder_path) if os.path.isfile(os.path.join(local_folder_path, f))]
-
-        out_message = "Data successfully loaded from AWS"
-        print(out_message)
-
+            out_message = "Data not loaded from AWS"
+            print(out_message)
     else:
-        out_message = "Data not loaded from AWS"
+        out_message = "No password provided. Please ask the data team for access if you need this."
         print(out_message)
 
     return files, out_message

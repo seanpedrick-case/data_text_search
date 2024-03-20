@@ -17,6 +17,7 @@
 *.pkl.gz
 *.pem
 *.json.out
+*.env
 docs/*
 build/*
 dist/*
@@ -26,3 +27,4 @@ experiments/*
 model/*
 build_deps/*
 build_deps_old/*
+AWS errors 19-03.txt

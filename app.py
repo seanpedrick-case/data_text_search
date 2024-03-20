@@ -157,6 +157,7 @@ depends on factors such as the type of documents or queries. Information taken f
             in_join_column = gr.Dropdown(label="Column to join in new data frame")
             search_df_join_column = gr.Dropdown(label="Column to join in search data frame")
         with gr.Accordion(label = "AWS data access", open = False):
+            aws_password_box = gr.Textbox(label="Password for AWS data access (ask Data team if you don't have this)")
             with gr.Row():
                 in_aws_keyword_file = gr.Dropdown(label="Choose keyword file to load from AWS (only valid for API Gateway app)", choices=["None", "Bioasq - Biomedical example data - keyword search"])
                 load_aws_keyword_data_button = gr.Button(value="Load keyword data from AWS", variant="secondary")
@@ -176,8 +177,8 @@ depends on factors such as the type of documents or queries. Information taken f
     in_no_search_results_button.click(display_info, inputs=in_no_search_info)
 
     ### Loading AWS data ###
-    load_aws_keyword_data_button.click(fn=load_data_from_aws, inputs=[in_aws_keyword_file], outputs=[in_bm25_file, out_aws_data_message])
-    load_aws_semantic_data_button.click(fn=load_data_from_aws, inputs=[in_aws_semantic_file], outputs=[in_semantic_file, out_aws_data_message])
+    load_aws_keyword_data_button.click(fn=load_data_from_aws, inputs=[in_aws_keyword_file, aws_password_box], outputs=[in_bm25_file, out_aws_data_message])
+    load_aws_semantic_data_button.click(fn=load_data_from_aws, inputs=[in_aws_semantic_file, aws_password_box], outputs=[in_semantic_file, out_aws_data_message])
           
     
     ### BM25 SEARCH ###
