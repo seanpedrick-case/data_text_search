@@ -6,17 +6,16 @@ import os
 
 PandasDataFrame = Type[pd.DataFrame]
 
-bucket_name = 'data-text-search-data'
-
-# Create a Session with the IAM role ARN
-aws_role = 'arn:aws:iam::460501890304:role/ecsTaskExecutionRole'
+bucket_name = os.environ['DATA_TEXT_SEARCH_BUCKET']
 
 try:
     session = boto3.Session(profile_name="default")
 except Exception as e:
     print(e)
 
-#sts = session.client("sts")
+# sts = session.client("sts")
+# Create a Session with the IAM role ARN
+# aws_role = os.environ['AWS_ROLE_DATA_TEXT_SEARCH']
 # response = sts.assume_role(
 #     RoleArn=aws_role,
 #     RoleSessionName="ecs-test-session"

@@ -128,7 +128,7 @@ depends on factors such as the type of documents or queries. Information taken f
     with gr.Tab(label="Advanced options"):
         with gr.Accordion(label="Data load / save options", open = True):
             with gr.Row():
-                in_clean_data = gr.Dropdown(label = "Clean text during load (remove html tags). For large files this may take some time!", value="Yes", choices=["Yes", "No"])
+                in_clean_data = gr.Dropdown(label = "Clean text during load (remove html tags). For large files this may take some time!", value="No", choices=["Yes", "No"])
                 return_intermediate_files = gr.Dropdown(label = "Return intermediate processing files from file preparation. Files can be loaded in to save processing time in future.", value="No", choices=["Yes", "No"])
                 embedding_super_compress = gr.Dropdown(label = "Round embeddings to three dp for smaller files with less accuracy.", value="Yes", choices=["Yes", "No"])
             #save_clean_data_button = gr.Button(value = "Save loaded data to file", scale = 1)
@@ -157,7 +157,7 @@ depends on factors such as the type of documents or queries. Information taken f
             in_join_column = gr.Dropdown(label="Column to join in new data frame")
             search_df_join_column = gr.Dropdown(label="Column to join in search data frame")
         with gr.Accordion(label = "AWS data access", open = False):
-            aws_password_box = gr.Textbox(label="Password for AWS data access (ask Data team if you don't have this)")
+            aws_password_box = gr.Textbox(label="Password for AWS data access (ask the Data team if you don't have this)")
             with gr.Row():
                 in_aws_keyword_file = gr.Dropdown(label="Choose keyword file to load from AWS (only valid for API Gateway app)", choices=["None", "Bioasq - Biomedical example data - keyword search"])
                 load_aws_keyword_data_button = gr.Button(value="Load keyword data from AWS", variant="secondary")
