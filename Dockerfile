@@ -29,8 +29,8 @@ RUN useradd -m -u 1000 user
 # Change ownership of /home/user directory
 RUN chown -R user:user /home/user
 
-# Create the output files directory and set its permissions
-RUN mkdir -p /home/user/output && chown -R user:user /home/user/output
+# Make output folder
+RUN mkdir -p /home/user/app/output && chown -R user:user /home/user/app/output
 
 # Switch to the "user" user
 USER user
@@ -45,6 +45,7 @@ ENV HOME=/home/user \
 	GRADIO_SERVER_NAME=0.0.0.0 \
 	GRADIO_SERVER_PORT=7860 \
 	GRADIO_THEME=huggingface \
+	AWS_STS_REGIONAL_ENDPOINT=regional \
 	#GRADIO_ROOT_PATH=/data-text-search \
 	SYSTEM=spaces
  
