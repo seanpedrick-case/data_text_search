@@ -129,7 +129,7 @@ depends on factors such as the type of documents or queries. Information taken f
         with gr.Accordion(label="Data load / save options", open = True):
             with gr.Row():
                 in_clean_data = gr.Dropdown(label = "Clean text during load (remove html tags). For large files this may take some time!", value="No", choices=["Yes", "No"])
-                return_intermediate_files = gr.Dropdown(label = "Return intermediate processing files from file preparation. Files can be loaded in to save processing time in future.", value="No", choices=["Yes", "No"])
+                return_intermediate_files = gr.Dropdown(label = "Return intermediate processing files from file preparation. Files can be loaded in to save processing time in future.", value="False", choices=["Yes", "No"])
                 embedding_super_compress = gr.Dropdown(label = "Round embeddings to three dp for smaller files with less accuracy.", value="Yes", choices=["Yes", "No"])
             #save_clean_data_button = gr.Button(value = "Save loaded data to file", scale = 1)
         with gr.Accordion(label="Keyword search options", open = False):

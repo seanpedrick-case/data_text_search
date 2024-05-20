@@ -9,6 +9,8 @@ import calendar
 #from tqdm import tqdm
 import gradio as gr
 
+from typing import List
+
 # Adding custom words to the stopwords
 custom_words = []
 my_stop_words = custom_words
@@ -24,6 +26,7 @@ custom_words.extend(cal_month)
 
 
 # #### Some of my cleaning functions
+replace_backslash = r'\\'
 email_start_pattern_regex = r'.*importance:|.*subject:'
 email_end_pattern_regex = r'kind regards.*|many thanks.*|sincerely.*'
 html_pattern_regex = r'<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});|\xa0|&nbsp;'
@@ -45,10 +48,11 @@ multiple_spaces_regex = r'\s{2,}'
 # nbsp_pattern = re.compile(nbsp_pattern_regex)
 
 
-def initial_clean(texts , progress=gr.Progress()):
+def initial_clean(texts:List[str] , progress=gr.Progress()):
     texts = pl.Series(texts)#[]
 
-    text = texts.str.replace_all(html_pattern_regex, '')
+    text = texts.str.replace_all(replace_backslash, '/')
+    text = text.str.replace_all(html_pattern_regex, '')
     text = text.str.replace_all(email_start_pattern_regex, '')
     text = text.str.replace_all(email_end_pattern_regex, '')
     text = text.str.replace_all(email_pattern_regex, '')

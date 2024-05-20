@@ -325,9 +325,9 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 
 	if return_intermediate_files == "Yes":
 		if clean == "Yes":
-			tokenised_data_file_name = data_file_out_name_no_ext + "_cleaned_tokenised.parquet"
+			tokenised_data_file_name = "output/" + data_file_out_name_no_ext + "_cleaned_tokenised.parquet"
 		else:
-			tokenised_data_file_name = data_file_out_name_no_ext + "_tokenised.parquet"
+			tokenised_data_file_name = "output/" + data_file_out_name_no_ext + "_tokenised.parquet"
 
 		pd.DataFrame(data={"Corpus":corpus}).to_parquet(tokenised_data_file_name)
 
@@ -354,9 +354,9 @@ def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_col
 	prepared_df = pd.concat([in_df, prepared_text_df], axis = 1)
 
 	if file_end == ".csv":
-		prepared_df.to_csv(file_name)
+		prepared_df.to_csv("output/" + file_name)
 	elif file_end == ".parquet":
-		prepared_df.to_parquet(file_name)
+		prepared_df.to_parquet("output/" + file_name)
 	else: file_name = None
 
 	return file_name, new_text_column, prepared_df
@@ -544,7 +544,7 @@ def bm25_search(free_text_query, in_no_search_results, original_data, searched_d
 
 	# Out file
 	query_str_file = ("_").join(token_query)
-	results_df_name = "keyword_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
+	results_df_name = "output/keyword_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
 
 	print("Saving search file output")
 	progress(0.7, desc = "Saving search output to file")

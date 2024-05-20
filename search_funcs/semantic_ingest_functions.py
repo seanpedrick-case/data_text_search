@@ -304,7 +304,7 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
 
         if clean == "No":
             #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs.parquet")
-            out_doc_file_name = file_name + "_prepared_docs.pkl.gz"
+            out_doc_file_name = "output/" + file_name + "_prepared_docs.pkl.gz"
             with gzip.open(out_doc_file_name, 'wb') as file:
                 pickle.dump(doc_sections, file)
 
@@ -312,7 +312,7 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         elif clean == "Yes":
             #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs_clean.parquet")
 
-            out_doc_file_name = file_name + "_cleaned_prepared_docs.pkl.gz"
+            out_doc_file_name = "output/" + file_name + "_cleaned_prepared_docs.pkl.gz"
             with gzip.open(out_doc_file_name, 'wb') as file:
                 pickle.dump(doc_sections, file)
 

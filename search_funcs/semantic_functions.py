@@ -292,7 +292,7 @@ def bge_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_va
     
     query_str_file = query_str.replace(" ", "_")
 
-    results_df_name = "semantic_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
+    results_df_name = "output/semantic_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
 
     print("Saving search output to file")
     progress(0.7, desc = "Saving search output to file")
@@ -589,7 +589,7 @@ def chroma_retrieval_deprecated(query_str:str, vectorstore, docs, orig_df_col:st
             
             results_df_out = process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_cut_off, vec_weight, orig_df_col, in_join_column, search_df_join_column)
 
-            results_df_name = "semantic_search_result.csv"
+            results_df_name = "output/semantic_search_result.csv"
             results_df_out.to_csv(results_df_name, index= None)
             results_first_text = results_df_out[orig_df_col].iloc[0]
 
