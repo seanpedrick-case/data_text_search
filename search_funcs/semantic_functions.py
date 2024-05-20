@@ -25,7 +25,7 @@ else:
 
 print("Device used is: ", torch_device)
 
-from search_funcs.helper_functions import create_highlighted_excel_wb
+from search_funcs.helper_functions import create_highlighted_excel_wb, ensure_output_folder_exists
 
 PandasDataFrame = Type[pd.DataFrame]
 
@@ -67,8 +67,11 @@ else:
     
 def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, output_file_state, clean, return_intermediate_files = "No", embeddings_super_compress = "No", embeddings_model = embeddings_model, progress=gr.Progress(track_tqdm=True)):
     '''
-    Takes a Langchain document class and saves it into a Chroma sqlite file.
+    Takes a Langchain document class and saves it into a Numpy array.
     '''
+
+    ensure_output_folder_exists()
+
     if not in_file:
         out_message = "No input file found. Please load in at least one file."
         print(out_message)
@@ -228,6 +231,8 @@ def bge_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_va
 
     # print("vectorstore loaded: ", vectorstore)
     progress(0, desc = "Conducting semantic search")
+
+    ensure_output_folder_exists()
 
     print("Searching")
 

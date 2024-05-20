@@ -7,8 +7,8 @@ import os
 PandasDataFrame = Type[pd.DataFrame]
 
 try:
+    session = boto3.Session()
     bucket_name = os.environ['DATA_TEXT_SEARCH_BUCKET']
-    session = boto3.Session(profile_name="default")
 except Exception as e:
     bucket_name = ''
     print(e)

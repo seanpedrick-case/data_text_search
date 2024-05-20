@@ -58,6 +58,18 @@ def get_file_path_end_with_ext(file_path):
 
     return filename_end
 
+def ensure_output_folder_exists():
+    """Checks if the 'output/' folder exists, creates it if not."""
+
+    folder_name = "output/"
+
+    if not os.path.exists(folder_name):
+        # Create the folder if it doesn't exist
+        os.makedirs(folder_name)
+        print(f"Created the 'output/' folder.")
+    else:
+        print(f"The 'output/' folder already exists.")
+
 def detect_file_type(filename):
     """Detect the file type based on its extension."""
     if (filename.endswith('.csv')) | (filename.endswith('.csv.gz')) | (filename.endswith('.zip')):

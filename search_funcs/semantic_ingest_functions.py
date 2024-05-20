@@ -31,7 +31,7 @@ chunk_size = 512
 chunk_overlap = 0
 start_index = True
 
-from search_funcs.helper_functions import get_file_path_end_with_ext, detect_file_type, get_file_path_end
+from search_funcs.helper_functions import get_file_path_end_with_ext, detect_file_type, get_file_path_end, ensure_output_folder_exists
 from search_funcs.bm25_functions import save_prepared_bm25_data
 from search_funcs.clean_funcs import initial_clean
 
@@ -198,6 +198,7 @@ def parse_metadata(row):
 def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_intermediate_files = "No", chunk_size=None, progress=gr.Progress(track_tqdm=True)) -> List[Document]:
     """Converts a DataFrame's content to a list of dictionaries in the 'Document' format, containing page_content and associated metadata."""
 
+    ensure_output_folder_exists()
     output_list = []
 
     if not in_file:

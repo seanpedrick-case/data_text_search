@@ -14,7 +14,7 @@ from datetime import datetime
 today_rev = datetime.now().strftime("%Y%m%d")
 
 from search_funcs.clean_funcs import initial_clean # get_lemma_tokens, stem_sentence
-from search_funcs.helper_functions import get_file_path_end_with_ext, get_file_path_end, create_highlighted_excel_wb
+from search_funcs.helper_functions import get_file_path_end_with_ext, get_file_path_end, create_highlighted_excel_wb, ensure_output_folder_exists
 
 # Load the SpaCy model
 from spacy.cli.download import download
@@ -232,6 +232,7 @@ class BM25:
 
 def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, clean="No",  return_intermediate_files = "No", progress=gr.Progress(track_tqdm=True)):
 	#print(in_file)
+	ensure_output_folder_exists()
 
 	if not in_file:
 		print("No input file found. Please load in at least one file.")
@@ -324,6 +325,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 		message = "Data loaded. Warning: dataset may be too short to get consistent search results."
 
 	if return_intermediate_files == "Yes":
+
 		if clean == "Yes":
 			tokenised_data_file_name = "output/" + data_file_out_name_no_ext + "_cleaned_tokenised.parquet"
 		else:
@@ -336,6 +338,8 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 	return corpus, message, df, out_file_name, None, df_list, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
 def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_column, progress=gr.Progress(track_tqdm=True)):
+
+	ensure_output_folder_exists()
 
 	# Check if the list and the dataframe have the same length
 	if len(prepared_text_list) != len(in_df):
@@ -543,6 +547,8 @@ def bm25_search(free_text_query, in_no_search_results, original_data, searched_d
 	results_df_out = results_df_out.sort_values(['search_score_abs', "search_text"], ascending=False)	
 
 	# Out file
+	ensure_output_folder_exists()
+
 	query_str_file = ("_").join(token_query)
 	results_df_name = "output/keyword_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
 
