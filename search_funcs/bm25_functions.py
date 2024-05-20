@@ -347,7 +347,7 @@ def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_col
 
 	file_end = ".parquet"
 
-	file_name = get_file_path_end(in_file_name) + "_cleaned" + file_end
+	file_name = "output/" + get_file_path_end(in_file_name) + "_cleaned" + file_end
 
 	new_text_column = in_bm25_column + "_cleaned"
 	prepared_text_df = pd.DataFrame(data={new_text_column:prepared_text_list})
@@ -358,9 +358,9 @@ def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_col
 	prepared_df = pd.concat([in_df, prepared_text_df], axis = 1)
 
 	if file_end == ".csv":
-		prepared_df.to_csv("output/" + file_name)
+		prepared_df.to_csv(file_name)
 	elif file_end == ".parquet":
-		prepared_df.to_parquet("output/" + file_name)
+		prepared_df.to_parquet(file_name)
 	else: file_name = None
 
 	return file_name, new_text_column, prepared_df
