@@ -26,6 +26,9 @@ RUN git lfs install
 RUN git clone https://huggingface.co/BAAI/bge-small-en-v1.5 /model/bge
 RUN rm -rf /model/bge/.git
 
+# Expose port 8080
+EXPOSE 8080
+
 # Set up a new user named "user" with user ID 1000
 RUN useradd -m -u 1000 user
 
@@ -34,6 +37,7 @@ RUN chown -R user:user /home/user
 
 # Make output folder
 RUN mkdir -p /home/user/app/output && chown -R user:user /home/user/app/output
+RUN mkdir -p /home/user/.cache/huggingface/hub && chown -R user:user /home/user/.cache/huggingface/hub
 
 # Switch to the "user" user
 USER user
@@ -46,7 +50,7 @@ ENV HOME=/home/user \
 	GRADIO_ALLOW_FLAGGING=never \
 	GRADIO_NUM_PORTS=1 \
 	GRADIO_SERVER_NAME=0.0.0.0 \
-	GRADIO_SERVER_PORT=7860 \
+	GRADIO_SERVER_PORT=8080 \
 	GRADIO_THEME=huggingface \
 	AWS_STS_REGIONAL_ENDPOINT=regional \
 	#GRADIO_ROOT_PATH=/data-text-search \
@@ -58,5 +62,6 @@ WORKDIR $HOME/app
 # Copy the current directory contents into the container at $HOME/app setting the owner to the user
 COPY --chown=user . $HOME/app
 #COPY . $HOME/app
+
 
 CMD ["python", "app.py"]
