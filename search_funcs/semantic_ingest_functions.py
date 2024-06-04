@@ -32,7 +32,7 @@ chunk_overlap = 0
 start_index = True
 
 from search_funcs.helper_functions import get_file_path_end_with_ext, detect_file_type, get_file_path_end, ensure_output_folder_exists
-from search_funcs.bm25_functions import save_prepared_bm25_data
+from search_funcs.bm25_functions import save_prepared_bm25_data, output_folder
 from search_funcs.clean_funcs import initial_clean
 
 def parse_file_not_used(file_paths, text_column='text'):
@@ -198,7 +198,7 @@ def parse_metadata(row):
 def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_intermediate_files = "No", chunk_size=None, progress=gr.Progress(track_tqdm=True)) -> List[Document]:
     """Converts a DataFrame's content to a list of dictionaries in the 'Document' format, containing page_content and associated metadata."""
 
-    ensure_output_folder_exists()
+    ensure_output_folder_exists(output_folder)
     output_list = []
 
     if not in_file:
@@ -305,7 +305,7 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
 
         if clean == "No":
             #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs.parquet")
-            out_doc_file_name = "output/" + file_name + "_prepared_docs.pkl.gz"
+            out_doc_file_name = output_folder + file_name + "_prepared_docs.pkl.gz"
             with gzip.open(out_doc_file_name, 'wb') as file:
                 pickle.dump(doc_sections, file)
 
@@ -313,7 +313,7 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         elif clean == "Yes":
             #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs_clean.parquet")
 
-            out_doc_file_name = "output/" + file_name + "_cleaned_prepared_docs.pkl.gz"
+            out_doc_file_name = output_folder + file_name + "_cleaned_prepared_docs.pkl.gz"
             with gzip.open(out_doc_file_name, 'wb') as file:
                 pickle.dump(doc_sections, file)
 

@@ -19,6 +19,24 @@ megabyte = 1024 * 1024  # Bytes in a megabyte
 file_size_mb = 500  # Size in megabytes
 file_size_bytes_500mb =  megabyte * file_size_mb
 
+def get_or_create_env_var(var_name, default_value):
+    # Get the environment variable if it exists
+    value = os.environ.get(var_name)
+    
+    # If it doesn't exist, set it to the default value
+    if value is None:
+        os.environ[var_name] = default_value
+        value = default_value
+    
+    return value
+
+# Retrieving or setting output folder
+env_var_name = 'GRADIO_OUTPUT_FOLDER'
+default_value = 'output/'
+
+output_folder = get_or_create_env_var(env_var_name, default_value)
+print(f'The value of {env_var_name} is {output_folder}')
+
 # Attempt to delete content of gradio temp folder
 def get_temp_folder_path():
     username = getpass.getuser()
@@ -58,17 +76,17 @@ def get_file_path_end_with_ext(file_path):
 
     return filename_end
 
-def ensure_output_folder_exists():
-    """Checks if the 'output/' folder exists, creates it if not."""
+def ensure_output_folder_exists(output_folder):
+    """Checks if the output folder exists, creates it if not."""
 
-    folder_name = "output/"
+    folder_name = output_folder
 
     if not os.path.exists(folder_name):
         # Create the folder if it doesn't exist
         os.makedirs(folder_name)
-        print(f"Created the 'output/' folder.")
+        print(f"Created the output folder:", folder_name)
     else:
-        print(f"The 'output/' folder already exists.")
+        print(f"The output folder already exists:", folder_name)
 
 def detect_file_type(filename):
     """Detect the file type based on its extension."""

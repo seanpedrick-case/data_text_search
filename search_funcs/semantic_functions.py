@@ -25,7 +25,7 @@ else:
 
 print("Device used is: ", torch_device)
 
-from search_funcs.helper_functions import create_highlighted_excel_wb, ensure_output_folder_exists
+from search_funcs.helper_functions import create_highlighted_excel_wb, ensure_output_folder_exists, output_folder
 
 PandasDataFrame = Type[pd.DataFrame]
 
@@ -70,7 +70,7 @@ def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, output_file_
     Takes a Langchain document class and saves it into a Numpy array.
     '''
 
-    ensure_output_folder_exists()
+    ensure_output_folder_exists(output_folder)
 
     if not in_file:
         out_message = "No input file found. Please load in at least one file."
@@ -232,7 +232,7 @@ def bge_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_va
     # print("vectorstore loaded: ", vectorstore)
     progress(0, desc = "Conducting semantic search")
 
-    ensure_output_folder_exists()
+    ensure_output_folder_exists(output_folder)
 
     print("Searching")
 
@@ -297,7 +297,7 @@ def bge_simple_retrieval(query_str:str, vectorstore, docs, orig_df_col:str, k_va
     
     query_str_file = query_str.replace(" ", "_")
 
-    results_df_name = "output/semantic_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
+    results_df_name = output_folder + "semantic_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
 
     print("Saving search output to file")
     progress(0.7, desc = "Saving search output to file")
@@ -594,7 +594,7 @@ def chroma_retrieval_deprecated(query_str:str, vectorstore, docs, orig_df_col:st
             
             results_df_out = process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_cut_off, vec_weight, orig_df_col, in_join_column, search_df_join_column)
 
-            results_df_name = "output/semantic_search_result.csv"
+            results_df_name = output_folder + "semantic_search_result.csv"
             results_df_out.to_csv(results_df_name, index= None)
             results_first_text = results_df_out[orig_df_col].iloc[0]
 

@@ -14,7 +14,7 @@ from datetime import datetime
 today_rev = datetime.now().strftime("%Y%m%d")
 
 from search_funcs.clean_funcs import initial_clean # get_lemma_tokens, stem_sentence
-from search_funcs.helper_functions import get_file_path_end_with_ext, get_file_path_end, create_highlighted_excel_wb, ensure_output_folder_exists
+from search_funcs.helper_functions import get_file_path_end_with_ext, get_file_path_end, create_highlighted_excel_wb, ensure_output_folder_exists, output_folder
 
 # Load the SpaCy model
 from spacy.cli.download import download
@@ -232,7 +232,7 @@ class BM25:
 
 def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, clean="No",  return_intermediate_files = "No", progress=gr.Progress(track_tqdm=True)):
 	#print(in_file)
-	ensure_output_folder_exists()
+	ensure_output_folder_exists(output_folder)
 
 	if not in_file:
 		print("No input file found. Please load in at least one file.")
@@ -327,9 +327,9 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 	if return_intermediate_files == "Yes":
 
 		if clean == "Yes":
-			tokenised_data_file_name = "output/" + data_file_out_name_no_ext + "_cleaned_tokenised.parquet"
+			tokenised_data_file_name = output_folder + data_file_out_name_no_ext + "_cleaned_tokenised.parquet"
 		else:
-			tokenised_data_file_name = "output/" + data_file_out_name_no_ext + "_tokenised.parquet"
+			tokenised_data_file_name = output_folder + data_file_out_name_no_ext + "_tokenised.parquet"
 
 		pd.DataFrame(data={"Corpus":corpus}).to_parquet(tokenised_data_file_name)
 
@@ -339,7 +339,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 
 def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_column, progress=gr.Progress(track_tqdm=True)):
 
-	ensure_output_folder_exists()
+	ensure_output_folder_exists(output_folder)
 
 	# Check if the list and the dataframe have the same length
 	if len(prepared_text_list) != len(in_df):
@@ -347,7 +347,7 @@ def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_col
 
 	file_end = ".parquet"
 
-	file_name = "output/" + get_file_path_end(in_file_name) + "_cleaned" + file_end
+	file_name = output_folder + get_file_path_end(in_file_name) + "_cleaned" + file_end
 
 	new_text_column = in_bm25_column + "_cleaned"
 	prepared_text_df = pd.DataFrame(data={new_text_column:prepared_text_list})
@@ -547,10 +547,10 @@ def bm25_search(free_text_query, in_no_search_results, original_data, searched_d
 	results_df_out = results_df_out.sort_values(['search_score_abs', "search_text"], ascending=False)	
 
 	# Out file
-	ensure_output_folder_exists()
+	ensure_output_folder_exists(output_folder)
 
 	query_str_file = ("_").join(token_query)
-	results_df_name = "output/keyword_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
+	results_df_name = output_folder + "keyword_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
 
 	print("Saving search file output")
 	progress(0.7, desc = "Saving search output to file")
