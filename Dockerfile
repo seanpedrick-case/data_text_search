@@ -30,14 +30,17 @@ RUN rm -rf /model/bge/.git
 EXPOSE 8080
 
 # Set up a new user named "user" with user ID 1000
-RUN useradd -m -u 1000 user
+#RUN useradd -m -u 1000 user
 
 # Change ownership of /home/user directory
-RUN chown -R user:user /home/user
+#RUN chown -R user:user /home/user
 
 # Make output folder
-RUN mkdir -p /home/user/app/output && chown -R user:user /home/user/app/output
-RUN mkdir -p /home/user/.cache/huggingface/hub && chown -R user:user /home/user/.cache/huggingface/hub
+#RUN mkdir -p /home/user/app/output && chown -R user:user /home/user/app/output
+#RUN mkdir -p /home/user/.cache/huggingface/hub && chown -R user:user /home/user/.cache/huggingface/hub
+
+RUN mkdir -p /home/user/app/output
+RUN mkdir -p /home/user/.cache/huggingface/hub
 
 # Switch to the "user" user
 USER user
@@ -60,8 +63,8 @@ ENV HOME=/home/user \
 WORKDIR $HOME/app
 
 # Copy the current directory contents into the container at $HOME/app setting the owner to the user
-COPY --chown=user . $HOME/app
-#COPY . $HOME/app
+#COPY --chown=user . $HOME/app
+COPY . $HOME/app
 
 
 CMD ["python", "app.py"]
