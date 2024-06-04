@@ -1,6 +1,9 @@
 # First stage: build dependencies
 FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm
 
+# Install Lambda web adapter in case you want to run with with an AWS Lamba function URL
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.3 /lambda-adapter /opt/extensions/lambda-adapter
+
 # Install wget
 RUN apt-get update && apt-get install -y wget
 
@@ -14,7 +17,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Gradio needs to be installed after due to conflict with spacy in requirements
-RUN pip install --no-cache-dir gradio==4.31.4 
+RUN pip install --no-cache-dir gradio==4.32.2 
 
 # Download the BGE embedding model during the build process
 RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
