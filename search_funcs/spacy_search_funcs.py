@@ -7,7 +7,7 @@ import gradio as gr
 import pandas as pd
 from typing import List, Type
 from datetime import datetime
-from search_funcs.helper_functions import create_highlighted_excel_wb
+from search_funcs.helper_functions import create_highlighted_excel_wb, output_folder
 
 PandasDataFrame = Type[pd.DataFrame]
 
@@ -106,7 +106,7 @@ def spacy_fuzzy_search(string_query:str, df_list: List[str], original_data: Pand
 
     # Out file
     query_str_file = ("_").join(tokenised_query)
-    results_df_name = "keyword_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
+    results_df_name = output_folder + "fuzzy_keyword_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
 
     print("Saving search file output")
     progress(0.7, desc = "Saving search output to file")

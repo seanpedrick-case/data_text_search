@@ -231,11 +231,6 @@ def put_columns_in_join_df(in_file):
     return gr.Dropdown(choices=concat_choices), new_df, out_message
 
 
-    """
-    A dummy function that exists just so that dropdown updates work correctly.
-    """
-    return None    
-
 def display_info(info_component):
     gr.Info(info_component)
 

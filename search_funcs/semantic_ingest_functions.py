@@ -68,9 +68,7 @@ def parse_file_not_used(file_paths, text_column='text'):
     file_names = []
 
     for file_path in file_paths:
-        #print(file_path.name)
-        #file = open(file_path.name, 'r')
-        #print(file)
+
         file_extension = detect_file_type(file_path.name)
         if file_extension in extension_to_parser:
             parsed_contents[file_path.name] = extension_to_parser[file_extension](file_path.name)
@@ -222,19 +220,11 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
     if "prepared_docs" in data_file_name:
         print("Loading in documents from file.")
 
-        #print(df[0:5])
-        #section_series = df.iloc[:,0]
-        #section_series = "{" + section_series + "}"
-
         doc_sections = df
 
-        #print(doc_sections[0])
-
         # Convert each element in the Series to a Document instance
-        #doc_sections = section_series.apply(lambda x: Document(**x))
 
         return doc_sections, "Finished preparing documents", output_list
-    #    df = document_to_dataframe(df.iloc[:,0])
 
     ingest_tic = time.perf_counter()
 
@@ -248,15 +238,8 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         clean_tic = time.perf_counter()
         print("Starting data clean.")
         
-        #df = df.drop_duplicates(text_column)
-        
         df_list = list(df[text_column])
         df_list = initial_clean(df_list)
-
-        # Get rid of old data and keep only the new
-        #df = df.drop(text_column, axis = 1)
-
-        
 
         # Save to file if you have cleaned the data. Text column has now been renamed with '_cleaned' at the send
         out_file_name, text_column, df = save_prepared_bm25_data(data_file_name, df_list, df, text_column)
@@ -271,13 +254,6 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
     cols = [col for col in df.columns if col != original_text_column]
 
     df["metadata"] = combine_metadata_columns(df, cols)
-
-    #df = df.rename(columns={text_column:"page_content"})
-
-    #print(df[["page_content", "metadata"]].to_dict(orient='records'))
-
-    #doc_sections = df[["page_content", "metadata"]].to_dict(orient='records')
-    #doc_sections = [Document(**row) for row in df[["page_content", "metadata"]].to_dict(orient='records')]
 
     progress(0.3, desc = "Converting data to document format")
 
@@ -295,29 +271,17 @@ def csv_excel_text_to_docs(df, in_file, text_column, clean = "No", return_interm
         progress(0.5, desc = "Saving prepared documents")
         data_file_out_name_no_ext = get_file_path_end(data_file_name)
         file_name = data_file_out_name_no_ext
-        #print(doc_sections)
-        #page_content_series_string = pd.Series(doc_sections).astype(str)
-        #page_content_series_string = page_content_series_string.str.replace(" type='Document'", "").str.replace("' metadata=", "', 'metadata':").str.replace("page_content=", "{'page_content':")
-        #page_content_series_string = page_content_series_string + "}"
-        #print(page_content_series_string[0])
-        #metadata_series_string = pd.Series(doc_sections[1]).astype(str)
-
 
         if clean == "No":
-            #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs.parquet")
             out_doc_file_name = output_folder + file_name + "_prepared_docs.pkl.gz"
             with gzip.open(out_doc_file_name, 'wb') as file:
                 pickle.dump(doc_sections, file)
 
-            #pd.Series(doc_sections).to_pickle(file_name + "_prepared_docs.pkl")
         elif clean == "Yes":
-            #pd.DataFrame(data = {"Documents":page_content_series_string}).to_parquet(file_name + "_prepared_docs_clean.parquet")
-
             out_doc_file_name = output_folder + file_name + "_cleaned_prepared_docs.pkl.gz"
             with gzip.open(out_doc_file_name, 'wb') as file:
                 pickle.dump(doc_sections, file)
 
-            #pd.Series(doc_sections).to_pickle(file_name + "_prepared_docs_clean.pkl")
         output_list.append(out_doc_file_name)
         print("Documents saved to file.")
 

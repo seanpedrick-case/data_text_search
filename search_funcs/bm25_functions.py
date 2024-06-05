@@ -220,12 +220,12 @@ class BM25:
 		return list(indices), docs, list(scores)
 
 	def save(self, filename):
-		with open(f"{filename}.pkl", "wb") as fsave:
+		with open(f"{output_folder}{filename}.pkl", "wb") as fsave:
 			pickle.dump(self, fsave, protocol=pickle.HIGHEST_PROTOCOL)
 
 	@staticmethod
 	def load(filename):
-		with open(f"{filename}.pkl", "rb") as fsave:
+		with open(f"{output_folder}{filename}.pkl", "rb") as fsave:
 			return pickle.load(fsave)
 
 # These following functions are my own work
@@ -432,9 +432,9 @@ def prepare_bm25(corpus, in_file, text_column, search_index, clean, return_inter
 		progress(0.8, desc = "Saving search index to file")
 
 		if clean == "Yes":
-			bm25_search_file_name = data_file_name_no_ext + '_cleaned_search_index.pkl.gz'
+			bm25_search_file_name = output_folder + data_file_name_no_ext + '_cleaned_search_index.pkl.gz'
 		else:
-			bm25_search_file_name = data_file_name_no_ext + '_search_index.pkl.gz'
+			bm25_search_file_name = output_folder + data_file_name_no_ext + '_search_index.pkl.gz'
 			#np.savez_compressed(bm25_search_file_name, bm25)
 
 		with gzip.open(bm25_search_file_name, 'wb') as file:
