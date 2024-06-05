@@ -126,10 +126,10 @@ def docs_to_bge_embed_np_array(docs_out, in_file, embeddings_state, output_file_
 
             progress(0.9, desc = "Saving embeddings to file")
             if embeddings_super_compress == "No":
-                semantic_search_file_name = data_file_name_no_ext + '_bge_embeddings.npz'
+                semantic_search_file_name = output_folder + data_file_name_no_ext + '_bge_embeddings.npz'
                 np.savez_compressed(semantic_search_file_name, embeddings_out)
             else:
-                semantic_search_file_name = data_file_name_no_ext + '_bge_embedding_compress.npz'
+                semantic_search_file_name = output_folder + data_file_name_no_ext + '_bge_embedding_compress.npz'
                 embeddings_out_round = np.round(embeddings_out, 3) 
                 embeddings_out_round *= 100 # Rounding not currently used
                 np.savez_compressed(semantic_search_file_name, embeddings_out_round)
