@@ -40,6 +40,7 @@ tokenizer = nlp.tokenizer
 PARAM_K1 = 1.5
 PARAM_B = 0.75
 IDF_CUTOFF = -inf
+bm25 = "" # Placeholder just so initial load doesn't fail
 
 # Class built off https://github.com/Inspirateur/Fast-BM25
 
@@ -263,6 +264,8 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 	tokenised_file_names = [string for string in file_list if "tokenised" in string.lower()]
 	search_index_file_names = [string for string in file_list if "gz" in string.lower()]
 
+	print("Dataframe columns:", df.columns)
+
 	df[text_column] = df[text_column].astype(str).str.lower()
 
 	if "copy_of_case_note_id" in df.columns:
@@ -386,8 +389,6 @@ def prepare_bm25(corpus, in_file, text_column, search_index, clean, return_inter
 		print(out_message)
 		return  out_message, None
 
-
-
 	file_list = [string.name for string in in_file]
 
 	#print(file_list)
@@ -444,13 +445,13 @@ def prepare_bm25(corpus, in_file, text_column, search_index, clean, return_inter
 
 		message = "Search parameters loaded."
 
-		return message, bm25_search_file_name
+		return message, bm25_search_file_name, bm25
 
 	message = "Search parameters loaded."
 
 	print(message)
 
-	return message, None
+	return message, None, bm25
 
 def convert_bm25_query_to_tokens(free_text_query, clean="No"):
     '''
@@ -473,7 +474,7 @@ def convert_bm25_query_to_tokens(free_text_query, clean="No"):
 
     return out_query
 
-def bm25_search(free_text_query, in_no_search_results, original_data, searched_data, text_column, in_join_file, clean,  in_join_column = "", search_df_join_column = "", progress=gr.Progress(track_tqdm=True)):   
+def bm25_search(free_text_query, in_no_search_results, original_data, searched_data, text_column, in_join_file, clean, bm25, in_join_column = "", search_df_join_column = "", progress=gr.Progress(track_tqdm=True)):   
 
 	progress(0, desc = "Conducting keyword search")
 	

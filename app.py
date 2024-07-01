@@ -8,7 +8,7 @@ PandasDataFrame = Type[pd.DataFrame]
 from search_funcs.bm25_functions import prepare_bm25_input_data, prepare_bm25, bm25_search
 from search_funcs.semantic_ingest_functions import csv_excel_text_to_docs
 from search_funcs.semantic_functions import docs_to_bge_embed_np_array, bge_simple_retrieval
-from search_funcs.helper_functions import display_info, initial_data_load, put_columns_in_join_df, get_temp_folder_path, empty_folder, output_folder
+from search_funcs.helper_functions import display_info, initial_data_load, put_columns_in_join_df, get_temp_folder_path, empty_folder, get_connection_params, output_folder
 from search_funcs.spacy_search_funcs import spacy_fuzzy_search
 from search_funcs.aws_functions import load_data_from_aws
 
@@ -30,6 +30,7 @@ with block:
     embeddings_state = gr.State(np.array([])) # globals()["embeddings"]
     search_index_state = gr.State()
     tokenised_state = gr.State()
+    bm25_search_object_state = gr.State()
 
     k_val = gr.State(9999)
     out_passages = gr.State(9999)
@@ -45,6 +46,9 @@ with block:
    
     orig_semantic_data_state = gr.State(pd.DataFrame())
     semantic_data_state = gr.State(pd.DataFrame())
+
+    session_hash_state = gr.State("")
+    s3_output_folder_state = gr.State("")
 
     in_k1_info = gr.State("""k1: Constant used for influencing the term frequency saturation. After saturation is reached, additional
 presence for the term adds a significantly less additional score. According to [1]_, experiments suggest
@@ -91,7 +95,6 @@ depends on factors such as the type of documents or queries. Information taken f
             with gr.Row():
                 output_single_text = gr.Textbox(label="Top result")
                 output_file = gr.File(label="File output")
-
 
     with gr.Tab("Semantic search"):
         gr.Markdown(
@@ -179,20 +182,20 @@ depends on factors such as the type of documents or queries. Information taken f
     
     ### BM25 SEARCH ###
     # Update dropdowns upon initial file load
-    in_bm25_file.change(initial_data_load, inputs=[in_bm25_file], outputs=[in_bm25_column, search_df_join_column, keyword_data_state, orig_keyword_data_state, search_index_state, embeddings_state, tokenised_state, load_finished_message, current_source])
+    in_bm25_file.change(initial_data_load, inputs=[in_bm25_file], outputs=[in_bm25_column, search_df_join_column, keyword_data_state, orig_keyword_data_state, search_index_state, embeddings_state, tokenised_state, load_finished_message, current_source], api_name="initial_load")
     in_join_file.change(put_columns_in_join_df, inputs=[in_join_file], outputs=[in_join_column, join_data_state, in_join_message])
  
     # Load in BM25 data
     load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, keyword_data_state, tokenised_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, keyword_data_state, output_file, output_file, keyword_data_list_state, in_bm25_column], api_name="load_keyword").\
-    then(fn=prepare_bm25, inputs=[corpus_state, in_bm25_file, in_bm25_column, search_index_state, in_clean_data, return_intermediate_files, in_k1, in_b, in_alpha], outputs=[load_finished_message, output_file], api_name="prepare_keyword")#.\
+    then(fn=prepare_bm25, inputs=[corpus_state, in_bm25_file, in_bm25_column, search_index_state, in_clean_data, return_intermediate_files, in_k1, in_b, in_alpha], outputs=[load_finished_message, output_file, bm25_search_object_state], api_name="prepare_keyword")
     
     
     # BM25 search functions on click or enter
-    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, orig_keyword_data_state, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword_search")
-    keyword_query.submit(fn=bm25_search, inputs=[keyword_query, in_no_search_results, orig_keyword_data_state, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file])
+    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, orig_keyword_data_state, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, bm25_search_object_state, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword_search")
+    keyword_query.submit(fn=bm25_search, inputs=[keyword_query, in_no_search_results, orig_keyword_data_state, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, bm25_search_object_state, in_join_column, search_df_join_column], outputs=[output_single_text, output_file])
 
     # Fuzzy search functions on click
-    fuzzy_search_button.click(fn=spacy_fuzzy_search, inputs=[keyword_query, keyword_data_list_state, keyword_data_state, in_bm25_column, join_data_state, search_df_join_column, in_join_column, no_spelling_mistakes], outputs=[output_single_text, output_file], api_name="fuzzy")
+    fuzzy_search_button.click(fn=spacy_fuzzy_search, inputs=[keyword_query, keyword_data_list_state, keyword_data_state, in_bm25_column, join_data_state, search_df_join_column, in_join_column, no_spelling_mistakes], outputs=[output_single_text, output_file], api_name="fuzzy_search")
     
     ### SEMANTIC SEARCH ###
 
@@ -203,30 +206,15 @@ depends on factors such as the type of documents or queries. Information taken f
         then(docs_to_bge_embed_np_array, inputs=[ingest_docs, in_semantic_file, embeddings_state, output_file_state, in_clean_data, return_intermediate_files, embedding_super_compress], outputs=[semantic_load_progress, vectorstore_state, semantic_output_file, output_file_state])
     
     # Semantic search query
-    semantic_submit.click(bge_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, semantic_min_distance, vec_weight, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic")
+    semantic_submit.click(bge_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, semantic_min_distance, vec_weight, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic_search")
     semantic_query.submit(bge_simple_retrieval, inputs=[semantic_query, vectorstore_state, ingest_docs, in_semantic_column, k_val, out_passages, semantic_min_distance, vec_weight, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file])
 
-# Simple run for HF spaces or local on your computer
-#block.queue().launch(debug=True) 
+    block.load(get_connection_params, inputs=None, outputs=[session_hash_state, s3_output_folder_state])
 
-# def get_params(request: gr.Request):
-#    if request:
-#        print("Request headers dictionary:", request.headers)
-#        print("IP address:", request.client.host)
-#        print("Query parameters:", dict(request.query_params))
-#    return request.query_params
-
-# request_params = get_params()
-# print(request_params)
-
-# Running on server (e.g. AWS) without specifying port
-block.queue().launch(ssl_verify=False) # root_path="/data-text-search" # server_name="0.0.0.0", 
-
-
-# Running on local server without https
-#block.queue().launch(server_name="0.0.0.0", server_port=7861, ssl_verify=False)
+# Launch the Gradio app
+if __name__ == "__main__":
+    block.queue().launch(show_error=True) # root_path="/data-text-search" # server_name="0.0.0.0", 
     
 # Running on local server with https: https://discuss.huggingface.co/t/how-to-run-gradio-with-0-0-0-0-and-https/38003 or https://dev.to/rajshirolkar/fastapi-over-https-for-development-on-windows-2p7d # Need to download OpenSSL and create own keys 
 # block.queue().launch(ssl_verify=False, share=False, debug=False, server_name="0.0.0.0",server_port=443,
 #                      ssl_certfile="cert.pem", ssl_keyfile="key.pem") # port 443 for https. Certificates currently not valid
-

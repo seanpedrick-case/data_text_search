@@ -15,6 +15,8 @@ from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl.styles import Font, Alignment
 
+from search_funcs.aws_functions import bucket_name
+
 megabyte = 1024 * 1024  # Bytes in a megabyte
 file_size_mb = 500  # Size in megabytes
 file_size_bytes_500mb =  megabyte * file_size_mb
@@ -48,6 +50,41 @@ def ensure_output_folder_exists(output_folder):
         print(f"Created the output folder:", folder_name)
     else:
         print(f"The output folder already exists:", folder_name)
+
+def get_connection_params(request: gr.Request):
+        if request:
+            #request_data = request.json()  # Parse JSON body
+            #print("All request data:", request_data)
+            #context_value = request_data.get('context') 
+            #if 'context' in request_data:
+            #     print("Request context dictionary:", request_data['context'])
+
+            #print("Request headers dictionary:", request.headers)
+            #print("All host elements", request.client)           
+            #print("IP address:", request.client.host)
+            #print("Query parameters:", dict(request.query_params))
+            # To get the underlying FastAPI items you would need to use await and some fancy @ stuff for a live query: https://fastapi.tiangolo.com/vi/reference/request/
+            #print("Request dictionary to object:", request.request.body())
+            print("Session hash:", request.session_hash)
+
+            if 'x-cognito-id' in request.headers:
+                out_session_hash = request.headers['x-cognito-id']
+                base_folder = "user-files/"
+                print("Cognito ID found:", out_session_hash)
+
+            else:
+                out_session_hash = request.session_hash
+                base_folder = "temp-files/"
+                print("Cognito ID not found. Using session hash as save folder.")
+
+            output_folder = base_folder + out_session_hash + "/"
+            if bucket_name:
+                print("S3 output folder is: " + "s3://" + bucket_name + "/" + output_folder)
+
+            return out_session_hash, output_folder
+        else:
+            print("No session parameters found.")
+            return "", ""
 
 # Attempt to delete content of gradio temp folder
 def get_temp_folder_path():
