@@ -17,7 +17,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Gradio needs to be installed after due to conflict with spacy in requirements
-RUN pip install --no-cache-dir gradio==4.32.2 
+RUN pip install --no-cache-dir gradio==4.36.1
 
 # Download the BGE embedding model during the build process
 RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash

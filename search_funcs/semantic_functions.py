@@ -206,6 +206,7 @@ def process_data_from_scores_df(df_docs, in_join_file, out_passages, vec_score_c
 
     results_df_out = results_df_out.drop(["page_section", "row", "source", "id"], axis=1, errors="ignore")
     results_df_out['distances'] = round(results_df_out['distances'].astype(float), 3)
+    
 
     # Join back to original df
     # results_df_out = orig_df.merge(length_more_limit[['ids', 'distances']], left_index = True, right_on = "ids", how="inner").sort_values("distances")

@@ -183,12 +183,12 @@ depends on factors such as the type of documents or queries. Information taken f
     in_join_file.change(put_columns_in_join_df, inputs=[in_join_file], outputs=[in_join_column, join_data_state, in_join_message])
  
     # Load in BM25 data
-    load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, keyword_data_state, tokenised_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, keyword_data_state, output_file, output_file, keyword_data_list_state, in_bm25_column]).\
-    then(fn=prepare_bm25, inputs=[corpus_state, in_bm25_file, in_bm25_column, search_index_state, in_clean_data, return_intermediate_files, in_k1, in_b, in_alpha], outputs=[load_finished_message, output_file])#.\
+    load_bm25_data_button.click(fn=prepare_bm25_input_data, inputs=[in_bm25_file, in_bm25_column, keyword_data_state, tokenised_state, in_clean_data, return_intermediate_files], outputs=[corpus_state, load_finished_message, keyword_data_state, output_file, output_file, keyword_data_list_state, in_bm25_column], api_name="load_keyword").\
+    then(fn=prepare_bm25, inputs=[corpus_state, in_bm25_file, in_bm25_column, search_index_state, in_clean_data, return_intermediate_files, in_k1, in_b, in_alpha], outputs=[load_finished_message, output_file], api_name="prepare_keyword")#.\
     
     
     # BM25 search functions on click or enter
-    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, orig_keyword_data_state, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword")
+    keyword_search_button.click(fn=bm25_search, inputs=[keyword_query, in_no_search_results, orig_keyword_data_state, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file], api_name="keyword_search")
     keyword_query.submit(fn=bm25_search, inputs=[keyword_query, in_no_search_results, orig_keyword_data_state, keyword_data_state, in_bm25_column, join_data_state, in_clean_data, in_join_column, search_df_join_column], outputs=[output_single_text, output_file])
 
     # Fuzzy search functions on click
@@ -209,15 +209,15 @@ depends on factors such as the type of documents or queries. Information taken f
 # Simple run for HF spaces or local on your computer
 #block.queue().launch(debug=True) 
 
-#def get_params(request: gr.Request):
+# def get_params(request: gr.Request):
 #    if request:
 #        print("Request headers dictionary:", request.headers)
 #        print("IP address:", request.client.host)
 #        print("Query parameters:", dict(request.query_params))
 #    return request.query_params
 
-#request_params = get_params()
-#print(request_params)
+# request_params = get_params()
+# print(request_params)
 
 # Running on server (e.g. AWS) without specifying port
 block.queue().launch(ssl_verify=False) # root_path="/data-text-search" # server_name="0.0.0.0", 
