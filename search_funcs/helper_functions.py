@@ -9,6 +9,8 @@ import gzip
 import pickle
 import numpy as np
 
+from typing import List
+
 # Openpyxl functions for output
 from openpyxl import Workbook
 from openpyxl.cell.text import InlineFont 
@@ -175,15 +177,15 @@ def read_file(filename):
 
     return file
 
-def initial_data_load(in_file):
+def initial_data_load(in_file:List[str]):
     '''
-    When file is loaded, update the column dropdown choices
+    When file is loaded, update the column dropdown choices and relevant state variables
     '''
     new_choices = []
     concat_choices = []
     index_load = None
     embed_load = np.array([])
-    tokenised_load =[]
+    tokenised_load = []
     out_message = ""
     current_source = ""
     df = pd.DataFrame()
@@ -257,7 +259,7 @@ def initial_data_load(in_file):
         
     return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), df, df, index_load, embed_load, tokenised_load, out_message, current_source
 
-def put_columns_in_join_df(in_file):
+def put_columns_in_join_df(in_file:str):
     '''
     When file is loaded, update the column dropdown choices
     '''
@@ -354,7 +356,20 @@ def highlight_found_text(search_text: str, full_text: str) -> str:
 
     return "".join(pos_tokens), combined_positions
 
-def create_rich_text_cell_from_positions(full_text, combined_positions):
+def create_rich_text_cell_from_positions(full_text: str, combined_positions: list[tuple[int, int]]) -> CellRichText:
+    """
+    Create a rich text cell with highlighted positions.
+
+    This function takes the full text and a list of combined positions, and creates a rich text cell
+    with the specified positions highlighted in red.
+
+    Parameters:
+    full_text (str): The full text to be processed.
+    combined_positions (list[tuple[int, int]]): A list of tuples representing the start and end positions to be highlighted.
+
+    Returns:
+    CellRichText: The created rich text cell with highlighted positions.
+    """
     # Construct pos_tokens
     red = InlineFont(color='00FF0000')
     rich_text_cell = CellRichText()
@@ -369,7 +384,21 @@ def create_rich_text_cell_from_positions(full_text, combined_positions):
 
     return rich_text_cell
 
-def create_highlighted_excel_wb(df, search_text, column_to_highlight):
+def create_highlighted_excel_wb(df: pd.DataFrame, search_text: str, column_to_highlight: str) -> Workbook:
+    """
+    Create a new Excel workbook with highlighted search text.
+
+    This function takes a DataFrame, a search text, and a column name to highlight. It creates a new Excel workbook,
+    highlights the occurrences of the search text in the specified column, and returns the workbook.
+
+    Parameters:
+    df (pd.DataFrame): The DataFrame containing the data to be written to the Excel workbook.
+    search_text (str): The text to search for and highlight in the specified column.
+    column_to_highlight (str): The name of the column in which to highlight the search text.
+
+    Returns:
+    Workbook: The created Excel workbook with highlighted search text.
+    """
 
     # Create a new Excel workbook
     wb = Workbook()

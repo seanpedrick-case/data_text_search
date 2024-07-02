@@ -27,8 +27,13 @@ except:
 	nlp = spacy.load("en_core_web_sm")
 	print("Successfully imported spaCy model")
 
-def spacy_fuzzy_search(string_query:str, df_list: List[str], original_data: PandasDataFrame, text_column:str, in_join_file: PandasDataFrame, search_df_join_column:str, in_join_column:str, no_spelling_mistakes:int = 1, progress=gr.Progress(track_tqdm=True)):
+def spacy_fuzzy_search(string_query:str, tokenised_data: List[List[str]], original_data: PandasDataFrame, text_column:str, in_join_file: PandasDataFrame, search_df_join_column:str, in_join_column:str, no_spelling_mistakes:int = 1, progress=gr.Progress(track_tqdm=True)):
     ''' Conduct fuzzy match on a list of data.'''
+
+    #print("df_list:", df_list)
+
+    # Convert tokenised data back into a list of strings
+    df_list = list(map(" ".join, tokenised_data))
 
     if len(df_list) > 10000:
          out_message = "Your data has more than 10,000 rows and will take more than three minutes to do a fuzzy search. Please try keyword or semantic search for data of this size." 

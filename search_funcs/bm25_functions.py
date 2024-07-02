@@ -8,6 +8,7 @@ import time
 import pandas as pd
 from numpy import inf
 import gradio as gr
+from typing import List
 
 from datetime import datetime
 
@@ -165,7 +166,7 @@ class BM25:
 		return [documents[i] for i in heapq.nlargest(n, scores.keys(), key=scores.__getitem__)]
 	
 
-	def get_top_n_with_score(self, query, documents, n=5):
+	def get_top_n_with_score(self, query:str, documents:List[str], n=5):
 		"""
 		Retrieve the top n documents for the query along with their scores.
 
@@ -229,15 +230,47 @@ class BM25:
 		with open(f"{output_folder}{filename}.pkl", "rb") as fsave:
 			return pickle.load(fsave)
 
-# These following functions are my own work
+def prepare_bm25_input_data(
+    in_file: list, 
+    text_column: str, 
+    data_state: pd.DataFrame, 
+    tokenised_state: list, 
+    clean: str = "No",  
+    return_intermediate_files: str = "No", 
+    progress: gr.Progress = gr.Progress(track_tqdm=True)
+) -> tuple:
+	"""
+	Prepare BM25 input data by loading, cleaning, and tokenizing the text data.
 
-def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, clean="No",  return_intermediate_files = "No", progress=gr.Progress(track_tqdm=True)):
-	#print(in_file)
+	Parameters
+	----------
+	in_file: list
+		List of input files to be processed.
+	text_column: str
+		The name of the text column in the data file to search.
+	data_state: pd.DataFrame
+		The current state of the data.
+	tokenised_state: list
+		The current state of the tokenized data.
+	clean: str, optional
+		Whether to clean the text data (default is "No").
+	return_intermediate_files: str, optional
+		Whether to return intermediate processing files (default is "No").
+	progress: gr.Progress, optional
+		Progress tracker for the function (default is gr.Progress(track_tqdm=True)).
+
+	Returns
+	-------
+	tuple
+		A tuple containing the prepared search text list, a message, the updated data state, 
+		the tokenized data, the search index, and a dropdown component for the text column.
+	"""
+
 	ensure_output_folder_exists(output_folder)
 
 	if not in_file:
 		print("No input file found. Please load in at least one file.")
-		return None, "No input file found. Please load in at least one file.", data_state, None, None, [], gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
+		return None, "No input file found. Please load in at least one file.", data_state, None, None, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
 	progress(0, desc = "Loading in data")
 	file_list = [string.name for string in in_file]
@@ -247,25 +280,24 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 	data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "gz" not in string.lower()]
 
 	if not data_file_names:
-		return None, "Please load in at least one csv/Excel/parquet data file.", data_state, None, None, [], gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
+		return None, "Please load in at least one csv/Excel/parquet data file.", data_state, None, None, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
 	if not text_column:
-		return None, "Please enter a column name to search.", data_state, None, None,[], gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
+		return None, "Please enter a column name to search.", data_state, None, None, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
 	data_file_name = data_file_names[0]
 
 	df = data_state #read_file(data_file_name)
-	data_file_out_name = get_file_path_end_with_ext(data_file_name)
+	#data_file_out_name = get_file_path_end_with_ext(data_file_name)
 	data_file_out_name_no_ext = get_file_path_end(data_file_name)
 
-	## Load in pre-tokenised corpus if exists
-	tokenised_df = pd.DataFrame()
+	## Load in pre-tokenised prepared_search_text_list if exists
+	#tokenised_df = pd.DataFrame()
 
-	tokenised_file_names = [string for string in file_list if "tokenised" in string.lower()]
+	#tokenised_file_names = [string for string in file_list if "tokenised" in string.lower()]
 	search_index_file_names = [string for string in file_list if "gz" in string.lower()]
 
-	print("Dataframe columns:", df.columns)
-
+	# Set all search text to lower case
 	df[text_column] = df[text_column].astype(str).str.lower()
 
 	if "copy_of_case_note_id" in df.columns:
@@ -273,10 +305,10 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 		df.loc[~df["copy_of_case_note_id"].isna(), text_column] = ""
 
 	if search_index_file_names:
-		corpus = list(df[text_column])
+		prepared_search_text_list = list(df[text_column])
 		message = "Tokenisation skipped - loading search index from file."
 		print(message)
-		return corpus, message, df, None, None, [], gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
+		return prepared_search_text_list, message, df, None, None, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
 
 	
 	if clean == "Yes":
@@ -285,11 +317,11 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 		print("Starting data clean.")
 
 		#df = df.drop_duplicates(text_column)
-		df_list = list(df[text_column])
-		df_list = initial_clean(df_list)
+		prepared_text_as_list = list(df[text_column])
+		prepared_text_as_list = initial_clean(prepared_text_as_list)
 
 		# Save to file if you have cleaned the data
-		out_file_name, text_column, df  = save_prepared_bm25_data(data_file_name, df_list, df, text_column)
+		out_file_name, text_column, df  = save_prepared_bm25_data(data_file_name, prepared_text_as_list, df, text_column)
 	
 		clean_toc = time.perf_counter()
 		clean_time_out = f"Cleaning the text took {clean_toc - clean_tic:0.1f} seconds."
@@ -297,7 +329,7 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 
 	else:
 		# Don't clean or save file to disk
-		df_list = list(df[text_column])
+		prepared_text_as_list = list(df[text_column])
 		print("No data cleaning performed")
 		out_file_name = None
 		
@@ -305,24 +337,27 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 	
 	progress(0.4, desc = "Tokenising text")
 
+	print("Tokenised state:", tokenised_state)
+
 	if tokenised_state:
-		tokenised_df = tokenised_state
-		corpus = tokenised_df.iloc[:,0].tolist()
+		prepared_search_text_list = tokenised_state.iloc[:,0].tolist()
 		print("Tokenised data loaded from file")
-		#print("Corpus is: ", corpus[0:5])
+		
+		#print("prepared_search_text_list is: ", prepared_search_text_list[0:5])
 
 	else:
 		tokeniser_tic = time.perf_counter()
-		corpus = []
+		prepared_search_text_list = []
 		batch_size = 256
-		for doc in tokenizer.pipe(progress.tqdm(df_list, desc = "Tokenising text", unit = "rows"), batch_size=batch_size):
-			corpus.append([token.text for token in doc])
+		for doc in tokenizer.pipe(progress.tqdm(prepared_text_as_list, desc = "Tokenising text", unit = "rows"), batch_size=batch_size):
+			prepared_search_text_list.append([token.text for token in doc])
 
 		tokeniser_toc = time.perf_counter()
 		tokenizer_time_out = f"Tokenising the text took {tokeniser_toc - tokeniser_tic:0.1f} seconds."
 		print(tokenizer_time_out)
+		#print("prepared_search_text_list is: ", prepared_search_text_list[0:5])
 
-	if len(df_list) >= 20:
+	if len(prepared_text_as_list) >= 20:
 		message = "Data loaded"
 	else:
 		message = "Data loaded. Warning: dataset may be too short to get consistent search results."
@@ -334,13 +369,29 @@ def prepare_bm25_input_data(in_file, text_column, data_state, tokenised_state, c
 		else:
 			tokenised_data_file_name = output_folder + data_file_out_name_no_ext + "_tokenised.parquet"
 
-		pd.DataFrame(data={"Corpus":corpus}).to_parquet(tokenised_data_file_name)
+		pd.DataFrame(data={"prepared_search_text_list":prepared_search_text_list}).to_parquet(tokenised_data_file_name)
 
-		return corpus, message, df, out_file_name, tokenised_data_file_name, df_list, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
+		return prepared_search_text_list, message, df, out_file_name, tokenised_data_file_name, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list()) # prepared_text_as_list, 
 
-	return corpus, message, df, out_file_name, None, df_list, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list())
+	return prepared_search_text_list, message, df, out_file_name, None, gr.Dropdown(allow_custom_value=True, value=text_column, choices=data_state.columns.to_list()) # prepared_text_as_list, 
 
-def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_column, progress=gr.Progress(track_tqdm=True)):
+def save_prepared_bm25_data(in_file_name: str, prepared_text_list: list, in_df: pd.DataFrame, in_bm25_column: str, progress: gr.Progress = gr.Progress(track_tqdm=True)) -> tuple:
+	"""
+	Save the prepared BM25 data to a file.
+
+	This function ensures the output folder exists, checks if the length of the prepared text list matches the input dataframe,
+	and saves the prepared data to a file in the specified format. The original column in the input dataframe is dropped to reduce file size.
+
+	Parameters:
+	- in_file_name (str): The name of the input file.
+	- prepared_text_list (list): The list of prepared text.
+	- in_df (pd.DataFrame): The input dataframe.
+	- in_bm25_column (str): The name of the column to be processed.
+	- progress (gr.Progress, optional): The progress tracker for the operation.
+
+	Returns:
+	- tuple: A tuple containing the file name, new text column name, and the prepared dataframe.
+	"""
 
 	ensure_output_folder_exists(output_folder)
 
@@ -368,26 +419,54 @@ def save_prepared_bm25_data(in_file_name, prepared_text_list, in_df, in_bm25_col
 
 	return file_name, new_text_column, prepared_df
 
-def prepare_bm25(corpus, in_file, text_column, search_index, clean, return_intermediate_files, k1=1.5, b = 0.75, alpha=-5, progress=gr.Progress(track_tqdm=True)):
-	#bm25.save("saved_df_bm25")
-	#bm25 = BM25.load(re.sub(r'\.pkl$', '', file_in.name))
+def prepare_bm25(
+    prepared_search_text_list: List[str], 
+    in_file: List[gr.File], 
+    text_column: str, 
+    search_index: BM25, 
+    clean: str, 
+    return_intermediate_files: str, 
+    k1: float = 1.5, 
+    b: float = 0.75, 
+    alpha: float = -5, 
+    progress: gr.Progress = gr.Progress(track_tqdm=True)
+) -> tuple:
+	"""
+	Prepare the BM25 search index.
 
-	
+	This function prepares the BM25 search index from the provided text list and input file. It ensures the necessary
+	files and columns are present, processes the data, and optionally saves intermediate files.
+
+	Parameters:
+	- prepared_search_text_list (List[str]): The list of prepared search text.
+	- in_file (List[gr.File]): The list of input files.
+	- text_column (str): The name of the column to search.
+	- search_index (BM25): The BM25 search index.
+	- clean (str): Indicates whether to clean the data.
+	- return_intermediate_files (str): Indicates whether to return intermediate files.
+	- k1 (float, optional): The k1 parameter for BM25. Default is 1.5.
+	- b (float, optional): The b parameter for BM25. Default is 0.75.
+	- alpha (float, optional): The alpha parameter for BM25. Default is -5.
+	- progress (gr.Progress, optional): The progress tracker for the operation.
+
+	Returns:
+	- tuple: A tuple containing the output message, BM25 search index, and other relevant information.
+	"""
 
 	if not in_file:
 		out_message ="No input file found. Please load in at least one file."
 		print(out_message)
-		return out_message, None
+		return out_message, None, None
 
-	if not corpus:
+	if not prepared_search_text_list:
 		out_message = "No data file found. Please load in at least one csv/Excel/Parquet file."
 		print(out_message)
-		return out_message, None
+		return out_message, None, None, None
 
 	if not text_column:
 		out_message = "Please enter a column name to search."
 		print(out_message)
-		return  out_message, None
+		return  out_message, None, None, None
 
 	file_list = [string.name for string in in_file]
 
@@ -397,36 +476,23 @@ def prepare_bm25(corpus, in_file, text_column, search_index, clean, return_inter
 	data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "gz" not in string.lower()]
 
 	if not data_file_names:
-		return "Please load in at least one csv/Excel/parquet data file.", None
+		return "Please load in at least one csv/Excel/parquet data file.", None, None, None
 
 	data_file_name = data_file_names[0]
 	data_file_out_name = get_file_path_end_with_ext(data_file_name)
 	data_file_name_no_ext = get_file_path_end(data_file_name)
 
-	# Check if there is a search index file already
-	#index_file_names = [string for string in file_list if "gz" in string.lower()]
-
 	progress(0.6, desc = "Preparing search index")
 
-	#if index_file_names:
 	if search_index:
-		#index_file_name = index_file_names[0]
-
-		#print(index_file_name)
-
-		bm25_load = search_index
-		
-
-		#index_file_out_name = get_file_path_end_with_ext(index_file_name)
-		#index_file_name_no_ext = get_file_path_end(index_file_name)
-
+		bm25 = search_index
 	else:
-		print("Preparing BM25 corpus")
+		print("Preparing BM25 search corpus")
 
-		bm25_load = BM25(corpus, k1=k1, b=b, alpha=alpha)
+		bm25 = BM25(prepared_search_text_list, k1=k1, b=b, alpha=alpha)
 
-	global bm25
-	bm25 = bm25_load
+	#global bm25
+	#bm25 = bm25_load
 
 	if return_intermediate_files == "Yes":
 		print("Saving search index file")
@@ -451,7 +517,7 @@ def prepare_bm25(corpus, in_file, text_column, search_index, clean, return_inter
 
 	print(message)
 
-	return message, None, bm25
+	return message, None, bm25, prepared_search_text_list
 
 def convert_bm25_query_to_tokens(free_text_query, clean="No"):
     '''
@@ -474,17 +540,81 @@ def convert_bm25_query_to_tokens(free_text_query, clean="No"):
 
     return out_query
 
-def bm25_search(free_text_query, in_no_search_results, original_data, searched_data, text_column, in_join_file, clean, bm25, in_join_column = "", search_df_join_column = "", progress=gr.Progress(track_tqdm=True)):   
+def bm25_search(
+    free_text_query: str, 
+    in_no_search_results: int, 
+    original_data: pd.DataFrame, 
+    searched_data: pd.DataFrame, 
+    text_column: str, 
+    in_join_file: str, 
+    clean: str, 
+    bm25: BM25, 
+    prepared_search_text_list_state: list, 
+    in_join_column: str = "", 
+    search_df_join_column: str = "", 
+    k1: float = 1.5, 
+    b: float = 0.75, 
+    alpha: float = -5, 
+    progress: gr.Progress = gr.Progress(track_tqdm=True)
+) -> tuple:
+	"""
+	Perform a BM25 search on the provided text data.
+
+	Parameters
+	----------
+	free_text_query : str
+		The query text to search for.
+	in_no_search_results : int
+		The number of search results to return.
+	original_data : pd.DataFrame
+		The original data containing the text to be searched.
+	searched_data : pd.DataFrame
+		The data that has been prepared for searching.
+	text_column : str
+		The name of the column in the data to search.
+	in_join_file : str
+		The file to join the search results with.
+	clean : str
+		Whether to clean the text data.
+	bm25 : BM25
+		The BM25 object used for searching.
+	prepared_search_text_list_state : list
+		The state of the prepared search text list.
+	in_join_column : str, optional
+		The column to join on in the input file (default is "").
+	search_df_join_column : str, optional
+		The column to join on in the search dataframe (default is "").
+	k1 : float, optional
+		The k1 parameter for BM25 (default is 1.5).
+	b : float, optional
+		The b parameter for BM25 (default is 0.75).
+	alpha : float, optional
+		The alpha parameter for BM25 (default is -5).
+	progress : gr.Progress, optional
+		Progress tracker for the function (default is gr.Progress(track_tqdm=True)).
+
+	Returns
+	-------
+	tuple
+		A tuple containing a message, the search results file name (if any), the BM25 object, and the prepared search text list.
+	"""
 
 	progress(0, desc = "Conducting keyword search")
+
+	print("in_join_file at start of bm25_search:", in_join_file)
+
+	if not bm25:
+		print("Preparing BM25 search corpus")
+
+		bm25 = BM25(prepared_search_text_list_state, k1=k1, b=b, alpha=alpha)
+
+	# print("bm25:", bm25)
 	
 	# Prepare query
 	if (clean == "Yes") | (text_column.endswith("_cleaned")):
 		token_query = convert_bm25_query_to_tokens(free_text_query, clean="Yes")
 	else:
 		token_query = convert_bm25_query_to_tokens(free_text_query, clean="No")
-
-	#print(token_query)
 
 	# Perform search
 	print("Searching")
@@ -504,7 +634,6 @@ def bm25_search(free_text_query, in_no_search_results, original_data, searched_d
 
 	# Join scores onto searched data
 	results_df_out = results_df[['index', 'search_text', 'search_score_abs']].merge(searched_data,left_on="index", right_index=True, how="left", suffixes = ("", "_y")).drop("index_y", axis=1, errors="ignore")
-
 	
 
 	# Join on data from duplicate case notes
@@ -516,33 +645,27 @@ def bm25_search(free_text_query, in_no_search_results, original_data, searched_d
 			print("Clean is yes")
 			orig_text_column = text_column.replace("_cleaned", "")
 
-		#print(orig_text_column)
-		#print(original_data.columns)
-
 		original_data["original_note_id"] = original_data["copy_of_case_note_id"]
 		original_data["original_note_id"] = original_data["original_note_id"].combine_first(original_data["note_id"])
 
 		results_df_out = results_df_out.merge(original_data[["original_note_id", "note_id", "copy_of_case_note_id", "person_id"]],left_on="note_id", right_on="original_note_id", how="left", suffixes=("_primary", "")) # .drop(orig_text_column, axis = 1)
 		results_df_out.loc[~results_df_out["copy_of_case_note_id"].isnull(), "search_text"] = ""
 		results_df_out.loc[~results_df_out["copy_of_case_note_id"].isnull(), text_column] = ""
-
-		#results_df_out = pd.concat([results_df_out, original_data[~original_data["copy_of_case_note_id"].isna()][["copy_of_case_note_id", "person_id"]]])
-		# Replace NaN with an empty string
-		# results_df_out.fillna('', inplace=True)
-		
-		
 	
+	print("in_join_file:", in_join_file)
+
 	# Join on additional files
 	if not in_join_file.empty:
 		progress(0.5, desc = "Joining on additional data file")
-		join_df = in_join_file
-		join_df[in_join_column] = join_df[in_join_column].astype(str).str.replace("\.0$","", regex=True)
+		#join_df = in_join_file
+		# Prepare join columns as string and remove .0 at end of stringified numbers
+		in_join_file[in_join_column] = in_join_file[in_join_column].astype(str).str.replace("\.0$","", regex=True)
 		results_df_out[search_df_join_column] = results_df_out[search_df_join_column].astype(str).str.replace("\.0$","", regex=True)
 
 		# Duplicates dropped so as not to expand out dataframe
-		join_df = join_df.drop_duplicates(in_join_column)
+		in_join_file = in_join_file.drop_duplicates(in_join_column)
 
-		results_df_out = results_df_out.merge(join_df,left_on=search_df_join_column, right_on=in_join_column, how="left", suffixes=('','_y'))#.drop(in_join_column, axis=1)
+		results_df_out = results_df_out.merge(in_join_file,left_on=search_df_join_column, right_on=in_join_column, how="left", suffixes=('','_y'))#.drop(in_join_column, axis=1)
 
 	# Reorder results by score, and whether there is text
 	results_df_out = results_df_out.sort_values(['search_score_abs', "search_text"], ascending=False)	
@@ -559,7 +682,7 @@ def bm25_search(free_text_query, in_no_search_results, original_data, searched_d
 	# Highlight found text and save to file
 	results_df_out_wb = create_highlighted_excel_wb(results_df_out, free_text_query, "search_text")
 	results_df_out_wb.save(results_df_name)
-	#results_df_out.to_excel(results_df_name, index= None)
+
 	results_first_text = results_df_out[text_column].iloc[0]
 
 	print("Returning results")
