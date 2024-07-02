@@ -1,5 +1,8 @@
 # First stage: build dependencies
-FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm
+#FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm
+
+# Trying Python 10 as I saw somewhere that Python 11 may result in corrupted openpyxl xlsx outputs
+FROM public.ecr.aws/docker/library/python:3.10.14-slim-bookworm
 
 # Install Lambda web adapter in case you want to run with with an AWS Lamba function URL
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.3 /lambda-adapter /opt/extensions/lambda-adapter

@@ -456,7 +456,7 @@ def prepare_bm25(
 	if not in_file:
 		out_message ="No input file found. Please load in at least one file."
 		print(out_message)
-		return out_message, None, None
+		return out_message, None, None, None
 
 	if not prepared_search_text_list:
 		out_message = "No data file found. Please load in at least one csv/Excel/Parquet file."
@@ -511,7 +511,7 @@ def prepare_bm25(
 
 		message = "Search parameters loaded."
 
-		return message, bm25_search_file_name, bm25
+		return message, bm25_search_file_name, bm25, prepared_search_text_list 
 
 	message = "Search parameters loaded."
 
