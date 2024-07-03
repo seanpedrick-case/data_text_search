@@ -67,7 +67,7 @@ def get_connection_params(request: gr.Request):
             #print("Query parameters:", dict(request.query_params))
             # To get the underlying FastAPI items you would need to use await and some fancy @ stuff for a live query: https://fastapi.tiangolo.com/vi/reference/request/
             #print("Request dictionary to object:", request.request.body())
-            print("Session hash:", request.session_hash)
+            #print("Session hash:", request.session_hash)
 
             if 'x-cognito-id' in request.headers:
                 out_session_hash = request.headers['x-cognito-id']
@@ -77,11 +77,11 @@ def get_connection_params(request: gr.Request):
             else:
                 out_session_hash = request.session_hash
                 base_folder = "temp-files/"
-                print("Cognito ID not found. Using session hash as save folder.")
+                #print("Cognito ID not found. Using session hash as save folder.")
 
             output_folder = base_folder + out_session_hash + "/"
-            if bucket_name:
-                print("S3 output folder is: " + "s3://" + bucket_name + "/" + output_folder)
+            #if bucket_name:
+            #    print("S3 output folder is: " + "s3://" + bucket_name + "/" + output_folder)
 
             return out_session_hash, output_folder
         else:
@@ -281,6 +281,21 @@ def put_columns_in_join_df(in_file:str):
         
     return gr.Dropdown(choices=concat_choices), new_df, out_message
 
+def load_spacy_model():
+	# Load the SpaCy model
+	from spacy.cli.download import download
+	import spacy
+	spacy.prefer_gpu()
+
+	try:
+		import en_core_web_sm
+		nlp = en_core_web_sm.load()
+		print("Successfully imported spaCy model")
+	except:
+		download("en_core_web_sm")
+		nlp = spacy.load("en_core_web_sm")
+		print("Successfully imported spaCy model")
+	return nlp
 
 def display_info(info_component):
     gr.Info(info_component)

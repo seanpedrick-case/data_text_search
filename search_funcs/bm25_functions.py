@@ -15,28 +15,7 @@ from datetime import datetime
 today_rev = datetime.now().strftime("%Y%m%d")
 
 from search_funcs.clean_funcs import initial_clean # get_lemma_tokens, stem_sentence
-from search_funcs.helper_functions import get_file_path_end_with_ext, get_file_path_end, create_highlighted_excel_wb, ensure_output_folder_exists, output_folder
-
-# Load the SpaCy model
-from spacy.cli.download import download
-import spacy
-spacy.prefer_gpu()
-
-#os.system("python -m spacy download en_core_web_sm")
-try:
-	import en_core_web_sm
-	nlp = en_core_web_sm.load()
-	print("Successfully imported spaCy model")
-    #nlp = spacy.load("en_core_web_sm")
-    #print(nlp._path)
-except:
-	download("en_core_web_sm")
-	nlp = spacy.load("en_core_web_sm")
-	print("Successfully imported spaCy model")
-    #print(nlp._path)
-
-# including punctuation rules and exceptions
-tokenizer = nlp.tokenizer
+from search_funcs.helper_functions import get_file_path_end_with_ext, get_file_path_end, create_highlighted_excel_wb, ensure_output_folder_exists, output_folder, load_spacy_model
 
 PARAM_K1 = 1.5
 PARAM_B = 0.75
@@ -230,6 +209,35 @@ class BM25:
 		with open(f"{output_folder}{filename}.pkl", "rb") as fsave:
 			return pickle.load(fsave)
 
+
+def tokenise_text_spacy(prepared_text_as_list:List[str], progress = gr.Progress(track_tqdm=True)):
+	'''
+	Tokenise a list of texts using the spaCy package and the en_core_web_sm model.
+	'''
+
+	# Load spaCy model
+	nlp = load_spacy_model()
+
+	prepared_search_text_list = []
+	batch_size = 256
+	for doc in nlp.tokenizer.pipe(progress.tqdm(prepared_text_as_list, desc = "Tokenising text", unit = "rows"), batch_size=batch_size):
+		prepared_search_text_list.append([token.text for token in doc])
+
+	return prepared_search_text_list
+
+def tokenise_text_nltk(prepared_text_as_list: List[str], progress= gr.Progress(track_tqdm=True)):
+	"""
+	Tokenise a list of texts using the NLTK package.
+	"""
+	import nltk
+	nltk.download('punkt', quiet=True)  # Download the necessary resource if not already present
+
+	prepared_search_text_list = []
+	for text in progress.tqdm(prepared_text_as_list, desc="Tokenising text", unit="rows"):
+		prepared_search_text_list.append(nltk.word_tokenize(text.lower()))  # Lowercase for consistency
+
+	return prepared_search_text_list
+
 def prepare_bm25_input_data(
     in_file: list, 
     text_column: str, 
@@ -348,9 +356,8 @@ def prepare_bm25_input_data(
 	else:
 		tokeniser_tic = time.perf_counter()
 		prepared_search_text_list = []
-		batch_size = 256
-		for doc in tokenizer.pipe(progress.tqdm(prepared_text_as_list, desc = "Tokenising text", unit = "rows"), batch_size=batch_size):
-			prepared_search_text_list.append([token.text for token in doc])
+
+		prepared_search_text_list = tokenise_text_spacy(prepared_text_as_list)
 
 		tokeniser_toc = time.perf_counter()
 		tokenizer_time_out = f"Tokenising the text took {tokeniser_toc - tokeniser_tic:0.1f} seconds."
@@ -519,26 +526,18 @@ def prepare_bm25(
 
 	return message, None, bm25, prepared_search_text_list
 
-def convert_bm25_query_to_tokens(free_text_query, clean="No"):
-    '''
-    Split open text query into tokens and then lemmatise to get the core of the word. Currently 'clean' has no effect.
-    '''  
+def convert_bm25_query_to_tokens(free_text_query:str):
+	"""
+	Split open text query into tokens.
+	"""
+	split_query = tokenise_text_spacy([free_text_query.lower()])
 
-    if clean=="Yes":
-        split_query = tokenizer(free_text_query.lower())
-        out_query = [token.text for token in split_query]
-        #out_query = stem_sentence(out_query)
-    else: 
-        split_query = tokenizer(free_text_query.lower())
-        out_query = [token.text for token in split_query]
+	# Flatten the list of lists into a single list
+	flattened_query = [token for sublist in split_query for token in sublist]
 
-    print("Search query out is:", out_query)
+	print("Search query out is:", flattened_query)
 
-    if isinstance(out_query,str):
-        print("Converting string")
-        out_query = [out_query]
-
-    return out_query
+	return flattened_query	
 
 def bm25_search(
     free_text_query: str, 
@@ -596,8 +595,10 @@ def bm25_search(
 	Returns
 	-------
 	tuple
-		A tuple containing a message, the search results file name (if any), the BM25 object, and the prepared search text list.
+		A tuple containing a message and the output search results files (if any).
 	"""
+
+	output_files = []
 
 	progress(0, desc = "Conducting keyword search")
 
@@ -611,10 +612,7 @@ def bm25_search(
 	# print("bm25:", bm25)
 	
 	# Prepare query
-	if (clean == "Yes") | (text_column.endswith("_cleaned")):
-		token_query = convert_bm25_query_to_tokens(free_text_query, clean="Yes")
-	else:
-		token_query = convert_bm25_query_to_tokens(free_text_query, clean="No")
+	token_query = convert_bm25_query_to_tokens(free_text_query)
 
 	# Perform search
 	print("Searching")
@@ -685,6 +683,13 @@ def bm25_search(
 
 	results_first_text = results_df_out[text_column].iloc[0]
 
+	output_files.append(results_df_name)
+
+	csv_output_file = output_folder + "keyword_search_result_" + today_rev + "_" +  query_str_file + ".csv" 
+	results_df_out.to_csv(csv_output_file, index=None)
+
+	output_files.append(csv_output_file)
+
 	print("Returning results")
 
-	return results_first_text, results_df_name
+	return results_first_text, output_files

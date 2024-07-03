@@ -7,7 +7,7 @@ PandasDataFrame = Type[pd.DataFrame]
 
 from search_funcs.bm25_functions import prepare_bm25_input_data, prepare_bm25, bm25_search
 from search_funcs.semantic_ingest_functions import csv_excel_text_to_docs
-from search_funcs.semantic_functions import docs_to_bge_embed_np_array, bge_semantic_search
+from search_funcs.semantic_functions import load_embedding_model, docs_to_bge_embed_np_array, bge_semantic_search
 from search_funcs.helper_functions import display_info, initial_data_load, put_columns_in_join_df, get_temp_folder_path, empty_folder, get_connection_params, output_folder
 from search_funcs.spacy_search_funcs import spacy_fuzzy_search
 from search_funcs.aws_functions import load_data_from_aws
@@ -24,24 +24,29 @@ with app:
 
     # BM25 state objects
     orig_keyword_data_state = gr.State(pd.DataFrame()) # Original data that is not changed #gr.Dataframe(pd.DataFrame(),visible=False) #gr.State(pd.DataFrame())
+    #orig_keyword_data_state = gr.State(pd.DataFrame()) # Original data that is not changed #gr.Dataframe(pd.DataFrame(),visible=False) #gr.State(pd.DataFrame())
     prepared_keyword_data_state = gr.State(pd.DataFrame()) # Data frame the contains modified data #gr.Dataframe(pd.DataFrame(),visible=False) #gr.State(pd.DataFrame())
     #tokenised_prepared_keyword_data_state = gr.State([]) # This is data that has been loaded in as tokens #gr.Dataframe(pd.DataFrame(),visible=False) #gr.State()
     tokenised_prepared_keyword_data_state = gr.State([]) # Data that has been prepared for search (tokenised) #gr.Dataframe(np.array([]), type="array", visible=False) #gr.State([])
-    bm25_search_index_state = gr.State()   
-
+    bm25_search_index_state = gr.State()
 
     # Semantic search state objects
     orig_semantic_data_state = gr.State(pd.DataFrame()) #gr.Dataframe(pd.DataFrame(),visible=False) # gr.State(pd.DataFrame())
     semantic_data_state = gr.State(pd.DataFrame()) #gr.Dataframe(pd.DataFrame(),visible=False) # gr.State(pd.DataFrame())
     semantic_input_document_format = gr.State([])
+
+    embeddings_model_name_state = gr.State("sentence-transformers/all-MiniLM-L6-v2")#"BAAI/bge-small-en-v1.5")
+    embeddings_model_loc_state = gr.State("minilm/")#"bge/")
     embeddings_state = gr.State(np.array([])) #gr.Dataframe(np.array([]), type="numpy", visible=False) #gr.State(np.array([])) # globals()["embeddings"]
+    embeddings_model_state = gr.State()
+    torch_device_state = gr.State("cpu")
     semantic_k_val = gr.Number(9999, visible=False)
 
     # State objects for app in general
     session_hash_state = gr.State("")
     s3_output_folder_state = gr.State("")
     join_data_state = gr.State(pd.DataFrame()) #gr.Dataframe(pd.DataFrame(), visible=False) #gr.State(pd.DataFrame())
-    output_file_state = gr.Dropdown([], visible=False, allow_custom_value=True) #gr.Dataframe(type="array", visible=False) #gr.State([])
+    output_file_state = gr.State([]) #gr.Dataframe(type="array", visible=False) #gr.State([])
 
     # Informational state objects
     in_k1_info = gr.State("""k1: Constant used for influencing the term frequency saturation. After saturation is reached, additional
@@ -95,7 +100,7 @@ depends on factors such as the type of documents or queries. Information taken f
     """
     **Thematic/semantic search**
 
-    This search type enables you to search for broader themes (e.g. happiness, nature) and the search will pick out text passages that relate to these themes even if they don't contain the exact words. 1. Load in data file (ideally a file with '_cleaned' at the end of the name, a pkl.gz file), with (optionally) the 'embeddings... .npz' file in the same folder to save loading time. 2. Select the field in your data to search. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the 'Enter semantic search query here' box below and press Enter/click on 'Start semantic search'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
+    This search type enables you to search for general terms (e.g. happiness, nature) and the search will pick out text passages that are most semantically similar to them. 1. Load in data file (ideally a file with '_cleaned' at the end of the name, a pkl.gz file), with (optionally) the 'embeddings... .npz' file in the same folder to save loading time. 2. Select the field in your data to search. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the 'Enter semantic search query here' box below and press Enter/click on 'Start semantic search'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
     """)       
 
         with gr.Row():
@@ -122,7 +127,7 @@ depends on factors such as the type of documents or queries. Information taken f
             with gr.Row():
                 in_clean_data = gr.Dropdown(label = "Clean text during load (remove html tags). For large files this may take some time!", value="No", choices=["Yes", "No"])
                 return_intermediate_files = gr.Dropdown(label = "Return intermediate processing files from file preparation. Files can be loaded in to save processing time in future.", value="No", choices=["Yes", "No"])
-                embedding_super_compress = gr.Dropdown(label = "Round embeddings to three dp for smaller files with less accuracy.", value="Yes", choices=["Yes", "No"])
+                embeddings_compress = gr.Dropdown(label = "Round embeddings to int8 precision for smaller files with less accuracy.", value="Yes", choices=["Yes", "No"])
             #save_clean_data_button = gr.Button(value = "Save loaded data to file", scale = 1)
         with gr.Accordion(label="Keyword search options", open = False):
             with gr.Row():
@@ -194,12 +199,12 @@ depends on factors such as the type of documents or queries. Information taken f
     # Load in a csv/excel file for semantic search
     in_semantic_file.change(initial_data_load, inputs=[in_semantic_file], outputs=[in_semantic_column,  search_df_join_column,  semantic_data_state, orig_semantic_data_state, bm25_search_index_state, embeddings_state, tokenised_prepared_keyword_data_state, semantic_load_progress, current_source_semantic])
     load_semantic_data_button.click(
-        csv_excel_text_to_docs, inputs=[semantic_data_state, in_semantic_file, in_semantic_column, in_clean_data, return_intermediate_files], outputs=[semantic_input_document_format, semantic_load_progress, output_file_state]).\
-        then(docs_to_bge_embed_np_array, inputs=[semantic_input_document_format, in_semantic_file, embeddings_state, output_file_state, in_clean_data, return_intermediate_files, embedding_super_compress], outputs=[semantic_load_progress, embeddings_state, semantic_output_file, output_file_state]) #  vectorstore_state
-    
+        csv_excel_text_to_docs, inputs=[semantic_data_state, in_semantic_file, in_semantic_column, in_clean_data, return_intermediate_files], outputs=[semantic_input_document_format, semantic_load_progress, output_file_state], api_name="convert_texts_to_documents").\
+        then(docs_to_bge_embed_np_array, inputs=[semantic_input_document_format, in_semantic_file, output_file_state, in_clean_data, embeddings_state, embeddings_model_name_state, embeddings_model_loc_state, return_intermediate_files, embeddings_compress], outputs=[semantic_load_progress, embeddings_state, semantic_output_file, output_file_state, embeddings_model_state], api_name="embed_documents")
+
     # Semantic search query
-    semantic_submit.click(bge_semantic_search, inputs=[semantic_query, embeddings_state, semantic_input_document_format, semantic_k_val, semantic_min_distance, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic_search")
-    semantic_query.submit(bge_semantic_search, inputs=[semantic_query, embeddings_state, semantic_input_document_format, semantic_k_val, semantic_min_distance, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file])
+    semantic_submit.click(bge_semantic_search, inputs=[semantic_query, embeddings_state, semantic_input_document_format, semantic_k_val, semantic_min_distance, embeddings_model_state, embeddings_model_name_state, embeddings_compress, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic_search")
+    semantic_query.submit(bge_semantic_search, inputs=[semantic_query, embeddings_state, semantic_input_document_format, semantic_k_val, semantic_min_distance, embeddings_model_state, embeddings_model_name_state, embeddings_compress, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file])
 
     app.load(get_connection_params, inputs=None, outputs=[session_hash_state, s3_output_folder_state])
 

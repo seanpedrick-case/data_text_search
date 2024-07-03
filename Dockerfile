@@ -1,11 +1,8 @@
 # First stage: build dependencies
-#FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm
+FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm
 
-# Trying Python 10 as I saw somewhere that Python 11 may result in corrupted openpyxl xlsx outputs
-FROM public.ecr.aws/docker/library/python:3.10.14-slim-bookworm
-
-# Install Lambda web adapter in case you want to run with with an AWS Lamba function URL
-COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.3 /lambda-adapter /opt/extensions/lambda-adapter
+# Optional - install Lambda web adapter in case you want to run with with an AWS Lamba function URL
+# COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.3 /lambda-adapter /opt/extensions/lambda-adapter
 
 # Install wget
 RUN apt-get update && apt-get install -y wget
@@ -20,14 +17,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Gradio needs to be installed after due to conflict with spacy in requirements
-RUN pip install --no-cache-dir gradio==4.36.1
+RUN pip install --no-cache-dir gradio==4.37.2
 
-# Download the BGE embedding model during the build process
-RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
-RUN apt-get install git-lfs -y
-RUN git lfs install
-RUN git clone https://huggingface.co/BAAI/bge-small-en-v1.5 /model/bge
-RUN rm -rf /model/bge/.git
+# Download the BGE embedding model during the build process. Create a directory for the model and download specific files using huggingface_hub
+RUN mkdir -p /model/minilm
+COPY download_model.py /src/download_model.py
+RUN python /src/download_model.py
 
 # Set up a new user named "user" with user ID 1000
 RUN useradd -m -u 1000 user
@@ -47,6 +42,7 @@ ENV HOME=/home/user \
 	PATH=/home/user/.local/bin:$PATH \
     PYTHONPATH=$HOME/app \
 	PYTHONUNBUFFERED=1 \
+	PYTHONDONTWRITEBYTECODE=1 \
 	GRADIO_ALLOW_FLAGGING=never \
 	GRADIO_NUM_PORTS=1 \
 	GRADIO_SERVER_NAME=0.0.0.0 \

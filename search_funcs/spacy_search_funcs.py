@@ -7,30 +7,19 @@ import gradio as gr
 import pandas as pd
 from typing import List, Type
 from datetime import datetime
-from search_funcs.helper_functions import create_highlighted_excel_wb, output_folder
+from search_funcs.helper_functions import create_highlighted_excel_wb, output_folder, load_spacy_model
 
 PandasDataFrame = Type[pd.DataFrame]
 
 today_rev = datetime.now().strftime("%Y%m%d")
 
-# Load the SpaCy model
 
-#os.system("python -m spacy download en_core_web_sm")
-try:
-	import en_core_web_sm
-	nlp = en_core_web_sm.load()
-	print("Successfully imported spaCy model")
-    #nlp = spacy.load("en_core_web_sm")
-    #print(nlp._path)
-except:
-	download("en_core_web_sm")
-	nlp = spacy.load("en_core_web_sm")
-	print("Successfully imported spaCy model")
 
 def spacy_fuzzy_search(string_query:str, tokenised_data: List[List[str]], original_data: PandasDataFrame, text_column:str, in_join_file: PandasDataFrame, search_df_join_column:str, in_join_column:str, no_spelling_mistakes:int = 1, progress=gr.Progress(track_tqdm=True)):
     ''' Conduct fuzzy match on a list of data.'''
 
-    #print("df_list:", df_list)
+    # Load spaCy model
+    nlp = load_spacy_model()
 
     # Convert tokenised data back into a list of strings
     df_list = list(map(" ".join, tokenised_data))

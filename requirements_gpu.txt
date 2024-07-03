@@ -2,7 +2,7 @@ pandas==2.2.2
 polars==0.20.3
 pyarrow==14.0.2
 openpyxl==3.1.3
-torch==2.3.1 --index-url https://download.pytorch.org/whl/cu121
+torch==2.4.0 --index-url https://download.pytorch.org/whl/nightly/cu121
 spacy
 en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz
 gradio

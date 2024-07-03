@@ -1,20 +1,15 @@
 # ## Some functions to clean text
-
 import re
 import string
-import polars as pl
 
 # Add calendar months onto stop words
 import calendar
-#from tqdm import tqdm
-import gradio as gr
 
 from typing import List
 
 # Adding custom words to the stopwords
 custom_words = []
 my_stop_words = custom_words
-
 
 cal_month = (list(calendar.month_name))
 cal_month = [x.lower() for x in cal_month]
@@ -23,7 +18,6 @@ cal_month = [x.lower() for x in cal_month]
 cal_month = [i for i in cal_month if i]
 #print(cal_month)
 custom_words.extend(cal_month)
-
 
 # #### Some of my cleaning functions
 replace_backslash = r'\\'
@@ -37,19 +31,19 @@ warning_pattern_regex = r'caution: this email originated from outside of the org
 nbsp_pattern_regex = r'&nbsp;'
 multiple_spaces_regex = r'\s{2,}'
 
-# Pre-compiling the regular expressions for efficiency
-# email_start_pattern = re.compile(email_start_pattern_regex)
-# email_end_pattern = re.compile(email_end_pattern_regex)
-# html_pattern = re.compile(html_pattern_regex)
-# email_pattern = re.compile(email_end_pattern_regex)
-# num_pattern = re.compile(num_pattern_regex)
-# postcode_pattern = re.compile(postcode_pattern_regex)
-# warning_pattern = re.compile(warning_pattern_regex)
-# nbsp_pattern = re.compile(nbsp_pattern_regex)
+def initial_clean(texts:List[str]):
+    """
+    This function cleans a list of text strings by performing various replacements using polars.
 
+    Args:
+        texts (List[str]): A list of strings to clean.
+        
+    Returns:
+        List[str]: A list of cleaned strings.
+    """
+    import polars as pl
 
-def initial_clean(texts:List[str] , progress=gr.Progress()):
-    texts = pl.Series(texts)#[]
+    texts = pl.Series(texts)
 
     text = texts.str.replace_all(replace_backslash, '/')
     text = text.str.replace_all(html_pattern_regex, '')
@@ -61,6 +55,33 @@ def initial_clean(texts:List[str] , progress=gr.Progress()):
     text = text.to_list()
     
     return text
+
+
+def initial_clean_pandas(texts: List[str]):
+    """
+    This function cleans a list of text strings by performing various replacements using pandas.
+
+    Args:
+        texts (List[str]): A list of strings to clean.
+        
+    Returns:
+        List[str]: A list of cleaned strings.
+    """
+    import pandas as pd
+
+    # Create a pandas Series from the text list for easier manipulation
+    text_series = pd.Series(texts)  
+    
+    # Replace patterns with pandas string methods (`.str.replace`)
+    text_series = text_series.astype(str).str.replace(replace_backslash, '/', regex=True)
+    text_series = text_series.astype(str).str.replace(html_pattern_regex, '', regex=True)
+    text_series = text_series.astype(str).str.replace(email_start_pattern_regex, '', regex=True)
+    text_series = text_series.astype(str).str.replace(email_end_pattern_regex, '', regex=True)
+    text_series = text_series.astype(str).str.replace(email_pattern_regex, '', regex=True)
+    text_series = text_series.astype(str).str.replace(multiple_spaces_regex, ' ', regex=True)
+    
+    # Convert cleaned Series back to a list
+    return text_series.tolist()
 
 def remove_hyphens(text_text):
     return re.sub(r'(\w+)-(\w+)-?(\w)?', r'\1 \2 \3', text_text)

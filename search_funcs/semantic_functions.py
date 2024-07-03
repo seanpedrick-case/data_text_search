@@ -6,58 +6,61 @@ import gradio as gr
 import numpy as np
 from datetime import datetime
 from search_funcs.helper_functions import get_file_path_end, create_highlighted_excel_wb, ensure_output_folder_exists, output_folder
-from torch import cuda, backends
-from sentence_transformers import SentenceTransformer
 PandasDataFrame = Type[pd.DataFrame]
-
 today_rev = datetime.now().strftime("%Y%m%d")
 
-# Check for torch cuda
-print("Is CUDA enabled? ", cuda.is_available())
-print("Is a CUDA device available on this computer?", backends.cudnn.enabled)
-if cuda.is_available():
-    torch_device = "cuda"
-    os.system("nvidia-smi")
+def load_embedding_model(embeddings_name = "BAAI/bge-small-en-v1.5", embedding_loc="bge/"):
 
-else: 
-    torch_device =  "cpu"
+    from torch import cuda, backends
+    from sentence_transformers import SentenceTransformer
 
-print("Device used is: ", torch_device)
+    # Check for torch cuda
+    print("Is CUDA enabled? ", cuda.is_available())
+    print("Is a CUDA device available on this computer?", backends.cudnn.enabled)
+    if cuda.is_available():
+        torch_device = "cuda"
+        #os.system("nvidia-smi")
+    else: 
+        torch_device =  "cpu"
 
-# Load embeddings
-embeddings_name = "BAAI/bge-small-en-v1.5"
+    print("Device used is: ", torch_device)
 
-# Define a list of possible local locations to search for the model
-local_embeddings_locations = [
-    "model/bge/", # Potential local location
-    "/model/bge/", # Potential location in Docker container
-    "/home/user/app/model/bge/" # This is inside a Docker container
-]
+    # Define a list of possible local locations to search for the model
+    local_embeddings_locations = [
+        "model/" + embedding_loc, # Potential local location
+        "/model/" + embedding_loc, # Potential location in Docker container
+        "/home/user/app/model/" + embedding_loc # This is inside a Docker container
+    ]
 
-# Attempt to load the model from each local location
-for location in local_embeddings_locations:
-    try:
-        embeddings_model = SentenceTransformer(location)
-        print(f"Found local model installation at: {location}")
-        break  # Exit the loop if the model is found
-    except Exception as e:
-        print(f"Failed to load model from {location}: {e}")
-        continue
-else:
-    # If the loop completes without finding the model in any local location
-    embeddings_model = SentenceTransformer(embeddings_name)
-    print("Could not find local model installation. Downloading from Huggingface")
-    
+    # Attempt to load the model from each local location
+    for location in local_embeddings_locations:
+        try:
+            embeddings_model = SentenceTransformer(location)
+            print(f"Found local model installation at: {location}")
+            break  # Exit the loop if the model is found
+        except Exception as e:
+            print(f"Failed to load model from {location}: {e}")
+            continue
+    else:
+        # If the loop completes without finding the model in any local location
+        embeddings_model = SentenceTransformer(embeddings_name)
+        print("Could not find local model installation. Downloading from Huggingface")
+
+    # Load the sentence transformer model and move it to CPU/GPU
+    embeddings_model = embeddings_model.to(torch_device)
+
+    return embeddings_model, torch_device
 
 def docs_to_bge_embed_np_array(
     docs_out: list, 
     in_file: list, 
-    embeddings_state: np.ndarray, 
     output_file_state: str, 
-    clean: str, 
+    clean: str,
+    embeddings_state: np.ndarray,
+    embeddings_model_name:str,
+    embeddings_model_loc:str,
     return_intermediate_files: str = "No", 
-    embeddings_super_compress: str = "No", 
-    embeddings_model: SentenceTransformer = embeddings_model, 
+    embeddings_compress: str = "No",    
     progress: gr.Progress = gr.Progress(track_tqdm=True)
 ) -> tuple:
     """
@@ -66,18 +69,20 @@ def docs_to_bge_embed_np_array(
     Parameters:
     - docs_out (list): List of documents to be embedded.
     - in_file (list): List of input files.
-    - embeddings_state (np.ndarray): Current state of embeddings.
     - output_file_state (str): State of the output file.
     - clean (str): Indicates if the data should be cleaned.
+    - embeddings_state (np.ndarray): Current state of embeddings.
+    - embeddings_model_name (str): The Huggingface repo name of the embeddings model.
+    - embeddings_model_loc (str): Embeddings model save location.
     - return_intermediate_files (str, optional): Whether to return intermediate files. Default is "No".
-    - embeddings_super_compress (str, optional): Whether to super compress the embeddings. Default is "No".
-    - embeddings_model (SentenceTransformer, optional): The embeddings model to use. Default is embeddings_model.
+    - embeddings_compress (str, optional): Whether to compress the embeddings to int8 precision. Default is "No".    
     - progress (gr.Progress, optional): Progress tracker for the function. Default is gr.Progress(track_tqdm=True).
 
     Returns:
     - tuple: A tuple containing the output message, embeddings, and output file state.
     """
 
+    embeddings_model, torch_device = load_embedding_model(embeddings_model_name, embeddings_model_loc)
 
     ensure_output_folder_exists(output_folder)
 
@@ -102,12 +107,29 @@ def docs_to_bge_embed_np_array(
 
     out_message = "Document processing complete. Ready to search."
 
-
     if embeddings_state.size == 0:
         tic = time.perf_counter()
         print("Starting to embed documents.")
 
-        embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = 32, normalize_embeddings=True) # For BGE
+        # Encode embeddings. If in normal mode, float32, if in 'super compress' mode, int8
+        batch_size = 32
+
+        if "bge" in embeddings_model_name:
+            print("Embedding with BGE model")
+            if embeddings_compress == "No":
+                print("Embedding with full fp32 precision")
+                embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size, normalize_embeddings=True)
+            else:
+                print("Embedding with int8 precision")
+                embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size, normalize_embeddings=True, precision="int8")
+        else:
+            print("Embedding with MiniLM-L6-v2 model")
+            if embeddings_compress == "No":
+                print("Embedding with full fp32 precision")
+                embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size)
+            else:
+                print("Embedding with int8 precision")
+                embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size, precision="int8")
 
         toc = time.perf_counter()
         time_out = f"The embedding took {toc - tic:0.1f} seconds"
@@ -119,27 +141,25 @@ def docs_to_bge_embed_np_array(
             else: data_file_name_no_ext = data_file_name_no_ext
 
             progress(0.9, desc = "Saving embeddings to file")
-            if embeddings_super_compress == "No":
+            if embeddings_compress == "No":
                 semantic_search_file_name = output_folder + data_file_name_no_ext + '_bge_embeddings.npz'
-                np.savez_compressed(semantic_search_file_name, embeddings_out)
             else:
                 semantic_search_file_name = output_folder + data_file_name_no_ext + '_bge_embedding_compress.npz'
-                embeddings_out_round = np.round(embeddings_out, 3) 
-                embeddings_out_round *= 100 # Rounding not currently used
-                np.savez_compressed(semantic_search_file_name, embeddings_out_round)
+                
+            np.savez_compressed(semantic_search_file_name, embeddings_out)
 
             output_file_state.append(semantic_search_file_name)
 
-            return out_message, embeddings_out, output_file_state, output_file_state
+            return out_message, embeddings_out, output_file_state, output_file_state, embeddings_model
 
-        return out_message, embeddings_out, output_file_state, output_file_state
+        return out_message, embeddings_out, output_file_state, output_file_state, embeddings_model
     else:
         # Just return existing embeddings if already exist
         embeddings_out = embeddings_state
     
     print(out_message)
 
-    return out_message, embeddings_out, output_file_state, output_file_state
+    return out_message, embeddings_out, output_file_state, output_file_state, embeddings_model
 
 def process_data_from_scores_df(
     df_docs: pd.DataFrame, 
@@ -226,14 +246,15 @@ def bge_semantic_search(
     embeddings: np.ndarray, 
     documents: list, 
     k_val: int, 
-    vec_score_cut_off: float, 
+    vec_score_cut_off: float,
+    embeddings_model,
+    embeddings_model_name: str,
+    embeddings_compress:str,
     in_join_file: pd.DataFrame, 
     in_join_column: str = None, 
-    search_df_join_column: str = None, 
-    device: str = torch_device, 
-    embeddings_model: SentenceTransformer = embeddings_model, 
+    search_df_join_column: str = None,
     progress: gr.Progress = gr.Progress(track_tqdm=True)
-) -> pd.DataFrame:
+) -> tuple:
     """
     Perform a semantic search using the BGE model.
 
@@ -243,33 +264,83 @@ def bge_semantic_search(
     - documents (list): The list of documents to search.
     - k_val (int): The number of top results to return.
     - vec_score_cut_off (float): The score cutoff for filtering results.
+    - embeddings_model (SentenceTransformer, optional): The embeddings model to use.
+    - embeddings_model_name (str): The Huggingface repo name of the embeddings model.
+    - embeddings_compress (str): Whether the embeddings have been compressed to int8 precision
     - in_join_file (pd.DataFrame): The DataFrame to join with the search results.
     - in_join_column (str, optional): The column name in the join DataFrame to join on. Default is None.
-    - search_df_join_column (str, optional): The column name in the search DataFrame to join on. Default is None.
-    - device (str, optional): The device to run the model on. Default is torch_device.
-    - embeddings_model (SentenceTransformer, optional): The embeddings model to use. Default is embeddings_model.
+    - search_df_join_column (str, optional): The column name in the search DataFrame to join on. Default is None.  
     - progress (gr.Progress, optional): Progress tracker for the function. Default is gr.Progress(track_tqdm=True).
 
     Returns:
-    - pd.DataFrame: The DataFrame containing the search results.
+    - tuple: The DataFrame containing the search results.
     """
 
     progress(0, desc = "Conducting semantic search")
+
+    output_files = []
 
     ensure_output_folder_exists(output_folder)
 
     print("Searching")
 
-    # Load the sentence transformer model and move it to GPU
-    embeddings_model = embeddings_model.to(device)
+    from sentence_transformers import quantize_embeddings
 
     # Encode the query using the sentence transformer and convert to a PyTorch tensor
-    query = embeddings_model.encode(query_str, normalize_embeddings=True)
+    if "bge" in embeddings_model_name:
+        if embeddings_compress == "Yes":
+            query_fp32 = embeddings_model.encode(query_str, normalize_embeddings=True)
 
-    # Sentence transformers method, not used:
-    cosine_similarities = query @ embeddings.T
+            #query = query_fp32
+            query = quantize_embeddings(
+            query_fp32,
+            precision="int8",
+            calibration_embeddings=embeddings)
 
-    # Flatten the tensor to a 1D array
+        else:
+            query = embeddings_model.encode(query_str, normalize_embeddings=True)
+
+        # Get cosine similarities
+        cosine_similarities = query @ embeddings.T
+
+        # Sentence transformers method, not used:
+        #cosine_similarities = query @ embeddings.T
+
+        #cosine_similarities = embeddings_model.similarity(query, embeddings)
+        # Flatten the tensor to a 1D array
+        #cosine_similarities = cosine_similarities.flatten()
+    else:
+        print("Comparing similarity using Minilm-L6-v2")
+
+        if embeddings_compress == "Yes":
+            query_fp32 = embeddings_model.encode(query_str, normalize_embeddings=True)
+
+            #query = query_fp32
+            query = quantize_embeddings(
+            query_fp32,
+            precision="int8",
+            calibration_embeddings=embeddings)
+        else:
+            query = embeddings_model.encode(query_str, normalize_embeddings=True)
+
+        #cosine_similarities = embeddings_model.cosine_similarity(query, embeddings)
+
+        print("query:", query_fp32)
+        print("embeddings:", embeddings)
+
+        embeddings_norm = np.linalg.norm(embeddings, axis=1)
+
+        embeddings_norm = np.linalg.norm(embeddings, axis=1, keepdims=True)  # Keep dims to allow broadcasting
+        normalized_embeddings = embeddings / embeddings_norm
+
+        print("normalized_embeddings:", normalized_embeddings)
+
+        expanded_query_fp32 = np.expand_dims(query_fp32, axis=0)
+        cosine_similarities = (expanded_query_fp32 @ normalized_embeddings.T)
+
+        print("Initial cosine similarities:", cosine_similarities)
+
+    # Flatten the tensor to a 1D array 
     cosine_similarities = cosine_similarities.flatten()
 
     # Create a Pandas Series
@@ -308,6 +379,13 @@ def bge_semantic_search(
 
     #results_df_out.to_excel(results_df_name, index= None)
     results_first_text = results_df_out.iloc[0, 1]
+
+    output_files.append(results_df_name)
+
+    csv_output_file = output_folder + "semantic_search_result_" + today_rev + "_" +  query_str_file + ".csv" 
+    results_df_out.to_csv(csv_output_file, index=None)
+
+    output_files.append(csv_output_file)
 
     print("Returning results")
 
