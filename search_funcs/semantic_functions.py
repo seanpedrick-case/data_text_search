@@ -1,4 +1,3 @@
-import os
 import time
 import pandas as pd
 from typing import Type
@@ -116,20 +115,15 @@ def docs_to_bge_embed_np_array(
 
         if "bge" in embeddings_model_name:
             print("Embedding with BGE model")
-            if embeddings_compress == "No":
-                print("Embedding with full fp32 precision")
-                embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size, normalize_embeddings=True)
-            else:
-                print("Embedding with int8 precision")
-                embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size, normalize_embeddings=True, precision="int8")
         else:
             print("Embedding with MiniLM-L6-v2 model")
-            if embeddings_compress == "No":
-                print("Embedding with full fp32 precision")
-                embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size)
-            else:
-                print("Embedding with int8 precision")
-                embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size, precision="int8")
+
+        if embeddings_compress == "No":
+            print("Embedding with full fp32 precision")
+            embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size)
+        else:
+            print("Embedding with int8 precision")
+            embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size, precision="int8")
 
         toc = time.perf_counter()
         time_out = f"The embedding took {toc - tic:0.1f} seconds"
@@ -288,60 +282,43 @@ def bge_semantic_search(
 
     # Encode the query using the sentence transformer and convert to a PyTorch tensor
     if "bge" in embeddings_model_name:
-        if embeddings_compress == "Yes":
-            query_fp32 = embeddings_model.encode(query_str, normalize_embeddings=True)
-
-            #query = query_fp32
-            query = quantize_embeddings(
-            query_fp32,
-            precision="int8",
-            calibration_embeddings=embeddings)
-
-        else:
-            query = embeddings_model.encode(query_str, normalize_embeddings=True)
-
-        # Get cosine similarities
-        cosine_similarities = query @ embeddings.T
-
-        # Sentence transformers method, not used:
-        #cosine_similarities = query @ embeddings.T
-
-        #cosine_similarities = embeddings_model.similarity(query, embeddings)
-        # Flatten the tensor to a 1D array
-        #cosine_similarities = cosine_similarities.flatten()
+        print("Comparing similarity using BGE model")
     else:
-        print("Comparing similarity using Minilm-L6-v2")
+        print("Comparing similarity using MiniLM-L6-v2 model")
 
-        if embeddings_compress == "Yes":
-            query_fp32 = embeddings_model.encode(query_str, normalize_embeddings=True)
 
-            #query = query_fp32
-            query = quantize_embeddings(
-            query_fp32,
-            precision="int8",
-            calibration_embeddings=embeddings)
-        else:
-            query = embeddings_model.encode(query_str, normalize_embeddings=True)
+    if embeddings_compress == "Yes":
+        query_fp32 = embeddings_model.encode(query_str)
 
-        #cosine_similarities = embeddings_model.cosine_similarity(query, embeddings)
+        # Using a query as int8 doesn't actually seem to work
+        # query_int8 = quantize_embeddings(
+        #     query_fp32, precision="int8", calibration_embeddings=embeddings
+        # )
+        
+    else:
+        query_fp32 = embeddings_model.encode(query_str)
+  
+    #print("query:", query_fp32)
+    #print("embeddings:", embeddings)
 
-        print("query:", query_fp32)
-        print("embeddings:", embeddings)
+    # Normalise embeddings
 
-        embeddings_norm = np.linalg.norm(embeddings, axis=1)
+    query = query_fp32.astype('float32')
 
-        embeddings_norm = np.linalg.norm(embeddings, axis=1, keepdims=True)  # Keep dims to allow broadcasting
-        normalized_embeddings = embeddings / embeddings_norm
+    query_norm = np.linalg.norm(query)
+    normalized_query = query / query_norm
 
-        print("normalized_embeddings:", normalized_embeddings)
+    embeddings = embeddings.astype('float32')
 
-        expanded_query_fp32 = np.expand_dims(query_fp32, axis=0)
-        cosine_similarities = (expanded_query_fp32 @ normalized_embeddings.T)
+    embeddings_norm = np.linalg.norm(embeddings, axis=1, keepdims=True)  # Keep dims to allow broadcasting
+    normalized_embeddings = embeddings / embeddings_norm
 
-        print("Initial cosine similarities:", cosine_similarities)
+    #print("normalized_query:", normalized_query)
+    #print("normalized_embeddings:", normalized_embeddings)
 
-    # Flatten the tensor to a 1D array 
-    cosine_similarities = cosine_similarities.flatten()
+    cosine_similarities = (normalized_query @ normalized_embeddings.T)
+
+    #print("Initial cosine similarities:", cosine_similarities)
 
     # Create a Pandas Series
     cosine_similarities_series = pd.Series(cosine_similarities)
@@ -379,14 +356,12 @@ def bge_semantic_search(
 
     #results_df_out.to_excel(results_df_name, index= None)
     results_first_text = results_df_out.iloc[0, 1]
-
     output_files.append(results_df_name)
 
-    csv_output_file = output_folder + "semantic_search_result_" + today_rev + "_" +  query_str_file + ".csv" 
-    results_df_out.to_csv(csv_output_file, index=None)
-
-    output_files.append(csv_output_file)
+    #csv_output_file = output_folder + "semantic_search_result_" + today_rev + "_" +  query_str_file + ".csv" 
+    #results_df_out.to_csv(csv_output_file, index=None)
+    #output_files.append(csv_output_file)
 
     print("Returning results")
 
-    return results_first_text, results_df_name
+    return results_first_text, output_files

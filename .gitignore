@@ -1,7 +1,6 @@
 *.csv
 *.pyc
 *.cpython-311.pyc
-*.cpython-310.pyc
 *.bat
 *.json
 *.xlsx
@@ -18,6 +17,7 @@
 *.pem
 *.json.out
 *.env
+*.zip
 docs/*
 build/*
 dist/*

@@ -1,7 +1,3 @@
-import spacy
-spacy.prefer_gpu()
-from spacy.cli.download import download
-from spacy.matcher import Matcher
 import numpy as np
 import gradio as gr
 import pandas as pd
@@ -13,10 +9,12 @@ PandasDataFrame = Type[pd.DataFrame]
 
 today_rev = datetime.now().strftime("%Y%m%d")
 
-
-
 def spacy_fuzzy_search(string_query:str, tokenised_data: List[List[str]], original_data: PandasDataFrame, text_column:str, in_join_file: PandasDataFrame, search_df_join_column:str, in_join_column:str, no_spelling_mistakes:int = 1, progress=gr.Progress(track_tqdm=True)):
     ''' Conduct fuzzy match on a list of data.'''
+
+    import spacy
+    spacy.prefer_gpu()
+    from spacy.matcher import Matcher
 
     # Load spaCy model
     nlp = load_spacy_model()

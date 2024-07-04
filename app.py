@@ -78,7 +78,7 @@ depends on factors such as the type of documents or queries. Information taken f
             current_source = gr.Textbox(label="Current data source(s)", value="None")
 
         with gr.Accordion(label = "Load in data", open=True):
-            in_bm25_file = gr.File(label="Upload data for keyword search", file_count= 'multiple', file_types =['.parquet', '.csv', '.pkl', '.pkl.gz'])
+            in_bm25_file = gr.File(label="Upload data for keyword search", file_count= 'multiple', file_types =['.parquet', '.csv', '.pkl', '.pkl.gz', '.zip'])
             with gr.Row():
                 in_bm25_column = gr.Dropdown(label="Enter the name of the text column in the data file to search") 
                 load_bm25_data_button = gr.Button(value="Load data")
@@ -107,13 +107,16 @@ depends on factors such as the type of documents or queries. Information taken f
             current_source_semantic = gr.Textbox(label="Current data source(s)", value="None")
 
         with gr.Accordion("Load in data", open = True):
-            in_semantic_file = gr.File(label="Upload data file for semantic search", file_count= 'multiple', file_types = ['.parquet', '.csv', '.npy', '.npz', '.pkl', '.pkl.gz'])
+            in_semantic_file = gr.File(label="Upload data file for semantic search", file_count= 'multiple', file_types = ['.parquet', '.csv', '.npy', '.npz', '.pkl', '.pkl.gz', '.zip'])
             
             with gr.Row():
                 in_semantic_column = gr.Dropdown(label="Enter the name of the text column in the data file to search")
                 load_semantic_data_button = gr.Button(value="Load data", variant="secondary")
                 
             semantic_load_progress = gr.Textbox(label="Load progress")
+        
+        with gr.Accordion(label="Semantic search options", open = False):
+            semantic_min_distance = gr.Slider(label = "Minimum distance score for search result to be included", value = 0.2, minimum=0, maximum=0.95, step=0.01)
         
         semantic_query = gr.Textbox(label="Enter semantic search query here")
         semantic_submit = gr.Button(value="Start semantic search", variant="primary")
@@ -146,8 +149,7 @@ depends on factors such as the type of documents or queries. Information taken f
                 in_search_param_button = gr.Button(value="Load search parameters (Need to click this if you changed anything above)")
         with gr.Accordion(label="Fuzzy search options", open = False):
                 no_spelling_mistakes = gr.Slider(label = "Number of spelling mistakes allowed in fuzzy search", value = 1, minimum=1, maximum=4, step=1)
-        with gr.Accordion(label="Semantic search options", open = False):
-            semantic_min_distance = gr.Slider(label = "Minimum distance score for search result to be included", value = 0.6, minimum=0, maximum=0.95, step=0.01)
+        
         with gr.Accordion(label = "Join on additional dataframes to results", open = False):
             in_join_file = gr.File(label="Upload your data to join here")
             in_join_message = gr.Textbox(label="Join file load progress")
@@ -180,7 +182,7 @@ depends on factors such as the type of documents or queries. Information taken f
     
     ### BM25 SEARCH ###
     # Update dropdowns upon initial file load
-    in_bm25_file.change(initial_data_load, inputs=[in_bm25_file], outputs=[in_bm25_column, search_df_join_column, prepared_keyword_data_state, orig_keyword_data_state, bm25_search_index_state, embeddings_state, tokenised_prepared_keyword_data_state, load_finished_message, current_source], api_name="initial_load")
+    in_bm25_file.upload(initial_data_load, inputs=[in_bm25_file], outputs=[in_bm25_column, search_df_join_column, prepared_keyword_data_state, orig_keyword_data_state, bm25_search_index_state, embeddings_state, tokenised_prepared_keyword_data_state, load_finished_message, current_source, in_bm25_file], api_name="keyword_data_load")
     in_join_file.change(put_columns_in_join_df, inputs=[in_join_file], outputs=[in_join_column, join_data_state, in_join_message])
  
     # Load in BM25 data
@@ -197,7 +199,8 @@ depends on factors such as the type of documents or queries. Information taken f
     ### SEMANTIC SEARCH ###
 
     # Load in a csv/excel file for semantic search
-    in_semantic_file.change(initial_data_load, inputs=[in_semantic_file], outputs=[in_semantic_column,  search_df_join_column,  semantic_data_state, orig_semantic_data_state, bm25_search_index_state, embeddings_state, tokenised_prepared_keyword_data_state, semantic_load_progress, current_source_semantic])
+    in_semantic_file.upload(initial_data_load, inputs=[in_semantic_file], outputs=[in_semantic_column,  search_df_join_column,  semantic_data_state, orig_semantic_data_state, bm25_search_index_state, embeddings_state, tokenised_prepared_keyword_data_state, semantic_load_progress, current_source_semantic, in_semantic_file], api_name="semantic_data_load")
+    
     load_semantic_data_button.click(
         csv_excel_text_to_docs, inputs=[semantic_data_state, in_semantic_file, in_semantic_column, in_clean_data, return_intermediate_files], outputs=[semantic_input_document_format, semantic_load_progress, output_file_state], api_name="convert_texts_to_documents").\
         then(docs_to_bge_embed_np_array, inputs=[semantic_input_document_format, in_semantic_file, output_file_state, in_clean_data, embeddings_state, embeddings_model_name_state, embeddings_model_loc_state, return_intermediate_files, embeddings_compress], outputs=[semantic_load_progress, embeddings_state, semantic_output_file, output_file_state, embeddings_model_state], api_name="embed_documents")

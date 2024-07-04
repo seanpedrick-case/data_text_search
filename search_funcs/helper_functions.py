@@ -6,6 +6,7 @@ import os
 import shutil
 import getpass
 import gzip
+import zipfile
 import pickle
 import numpy as np
 
@@ -177,7 +178,40 @@ def read_file(filename):
 
     return file
 
-def initial_data_load(in_file:List[str]):
+def process_zip_files(file_list, progress=gr.Progress(track_tqdm=True)):
+    """
+    Processes a list of file names, unzipping any ZIP files found
+    and adding the extracted file names to the list.
+
+    Args:
+        file_list: A list of file names (strings).
+    """
+    progress(0.1, desc="Unzipping zip files")
+
+    i = 0
+    while i < len(file_list):  # Use 'while' for dynamic list changes
+        file_path = file_list[i]
+
+        if file_path.endswith(".zip"):
+            try:
+                zip_dir = os.path.dirname(file_path) or "."  # Get zip file's directory or use current if none
+                with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                    zip_ref.extractall(zip_dir)  # Extract to zip's directory
+                    #print("List of files in zip:", zip_ref.namelist())
+                    extracted_files = [os.path.join(zip_dir, name) for name in zip_ref.namelist()]  
+                    file_list.extend(extracted_files)
+                    
+            except zipfile.BadZipFile:
+                print(f"Warning: '{file_path}' is not a valid zip file.")
+
+        i += 1
+
+    file_list = [file for file in file_list if not file.endswith(".zip")]
+    print("file_list after files in zip extracted:", file_list)
+
+    return file_list
+
+def initial_data_load(in_file:List[str], progress = gr.Progress(track_tqdm=True)):
     '''
     When file is loaded, update the column dropdown choices and relevant state variables
     '''
@@ -192,10 +226,15 @@ def initial_data_load(in_file:List[str]):
 
     file_list = [string.name for string in in_file]
 
-    #print(file_list)
+    # If a zip file is loaded, unzip it and add the file names to the file_list
+    file_list = process_zip_files(file_list)
+
+    #print("File_list that makes it to main data load function:", file_list)         
+
+    progress(0.3, desc="Loading in data files")
 
     data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "search_index" not in string.lower()]
-    print(data_file_names)
+    print("Data file names:", data_file_names)
 
     if not data_file_names:
         out_message = "Please load in at least one csv/Excel/parquet data file."
@@ -204,9 +243,10 @@ def initial_data_load(in_file:List[str]):
 
     # This if you have loaded in a documents object for the semantic search
     if "pkl" in data_file_names[0]: 
+        print("Document object for semantic search:", data_file_names[0])
         df = read_file(data_file_names[0])
         new_choices = list(df[0].metadata.keys()) #["Documents"] #["page_contents"] + 
-        current_source = get_file_path_end_with_ext(data_file_names[0])
+        current_source = get_file_path_end_with_ext(data_file_names[0])  
 
     # This if you have loaded in a csv/parquets/xlsx
     else:
@@ -231,11 +271,14 @@ def initial_data_load(in_file:List[str]):
 
     concat_choices.extend(new_choices)
 
+    progress(0.6, desc="Loading in embedding/search index files")
+
     # Check if there is a search index file already
-    index_file_names = [string for string in file_list if "gz" in string.lower()]
+    index_file_names = [string for string in file_list if ".gz" in string.lower()]
 
     if index_file_names:
         index_file_name = index_file_names[0]
+        print("Search index file name found:", index_file_name)
         index_load = read_file(index_file_name)
 
     embeddings_file_names = [string for string in file_list if "embedding" in string.lower()]
@@ -254,10 +297,10 @@ def initial_data_load(in_file:List[str]):
     if tokenised_file_names:
         tokenised_load = read_file(tokenised_file_names[0])
 
-    out_message = "Initial data check successful. Next, choose a data column to search in the drop down above, then click 'Load data'"
+    out_message = "Initial data load successful. Next, choose a data column to search in the drop down above, then click 'Load data'"
     print(out_message)
         
-    return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), df, df, index_load, embed_load, tokenised_load, out_message, current_source
+    return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), df, df, index_load, embed_load, tokenised_load, out_message, current_source, file_list
 
 def put_columns_in_join_df(in_file:str):
     '''

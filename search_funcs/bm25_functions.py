@@ -685,10 +685,9 @@ def bm25_search(
 
 	output_files.append(results_df_name)
 
-	csv_output_file = output_folder + "keyword_search_result_" + today_rev + "_" +  query_str_file + ".csv" 
-	results_df_out.to_csv(csv_output_file, index=None)
-
-	output_files.append(csv_output_file)
+	#csv_output_file = output_folder + "keyword_search_result_" + today_rev + "_" +  query_str_file + ".csv" 
+	#results_df_out.to_csv(csv_output_file, index=None)
+	#output_files.append(csv_output_file)
 
 	print("Returning results")
 

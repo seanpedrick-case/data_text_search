@@ -1,7 +1,6 @@
 *.csv
 *.pyc
 *.cpython-311.pyc
-*.cpython-310.pyc
 *.bat
 *.json
 *.xlsx
@@ -16,6 +15,7 @@
 *.pkl
 *.pkl.gz
 *.pem
+*.zip
 docs/*
 build/*
 dist/*
