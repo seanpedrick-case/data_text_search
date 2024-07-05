@@ -36,11 +36,14 @@ def get_or_create_env_var(var_name, default_value):
     return value
 
 # Retrieving or setting output folder
-env_var_name = 'GRADIO_OUTPUT_FOLDER'
-default_value = 'output/'
+output_folder = get_or_create_env_var('GRADIO_OUTPUT_FOLDER', 'output/')
+print(f'The value of GRADIO_OUTPUT_FOLDER is {output_folder}')
 
-output_folder = get_or_create_env_var(env_var_name, default_value)
-print(f'The value of {env_var_name} is {output_folder}')
+# Retrieving or setting RUNNING_ON_APP_RUNNER
+running_on_app_runner_var = get_or_create_env_var('RUNNING_ON_APP_RUNNER', '0')
+print(f'The value of RUNNING_ON_APP_RUNNER is {running_on_app_runner_var}')
+
+
 
 def ensure_output_folder_exists(output_folder):
     """Checks if the output folder exists, creates it if not."""
@@ -69,6 +72,22 @@ def get_connection_params(request: gr.Request):
             # To get the underlying FastAPI items you would need to use await and some fancy @ stuff for a live query: https://fastapi.tiangolo.com/vi/reference/request/
             #print("Request dictionary to object:", request.request.body())
             #print("Session hash:", request.session_hash)
+
+            # Retrieving or setting CUSTOM_CLOUDFRONT_HEADER
+            CUSTOM_CLOUDFRONT_HEADER_var = get_or_create_env_var('CUSTOM_CLOUDFRONT_HEADER', '')
+            print(f'The value of CUSTOM_CLOUDFRONT_HEADER is {CUSTOM_CLOUDFRONT_HEADER_var}')
+
+            # Retrieving or setting CUSTOM_CLOUDFRONT_HEADER_VALUE
+            CUSTOM_CLOUDFRONT_HEADER_VALUE_var = get_or_create_env_var('CUSTOM_CLOUDFRONT_HEADER_VALUE', '')
+            print(f'The value of CUSTOM_CLOUDFRONT_HEADER_VALUE_var is {CUSTOM_CLOUDFRONT_HEADER_VALUE_var}')
+
+            if CUSTOM_CLOUDFRONT_HEADER_var and CUSTOM_CLOUDFRONT_HEADER_VALUE_var:
+                if CUSTOM_CLOUDFRONT_HEADER_var in request.headers:
+                    supplied_cloudfront_custom_value = request.headers[CUSTOM_CLOUDFRONT_HEADER_var]
+                    if supplied_cloudfront_custom_value == CUSTOM_CLOUDFRONT_HEADER_VALUE_var:
+                        print("Custom Cloudfront header found:", supplied_cloudfront_custom_value)
+                    else:
+                        raise(ValueError, "Custom Cloudfront header value does not match expected value.")
 
             if 'x-cognito-id' in request.headers:
                 out_session_hash = request.headers['x-cognito-id']
