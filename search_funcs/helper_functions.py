@@ -9,7 +9,6 @@ import gzip
 import zipfile
 import pickle
 import numpy as np
-
 from typing import List
 
 # Openpyxl functions for output
@@ -18,7 +17,7 @@ from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl.styles import Font, Alignment
 
-from search_funcs.aws_functions import bucket_name
+#from search_funcs.aws_functions import bucket_name
 
 megabyte = 1024 * 1024  # Bytes in a megabyte
 file_size_mb = 500  # Size in megabytes
@@ -39,9 +38,9 @@ def get_or_create_env_var(var_name, default_value):
 output_folder = get_or_create_env_var('GRADIO_OUTPUT_FOLDER', 'output/')
 print(f'The value of GRADIO_OUTPUT_FOLDER is {output_folder}')
 
-# Retrieving or setting RUNNING_ON_APP_RUNNER
-running_on_app_runner_var = get_or_create_env_var('RUNNING_ON_APP_RUNNER', '0')
-print(f'The value of RUNNING_ON_APP_RUNNER is {running_on_app_runner_var}')
+# Retrieving or setting RUNNING_ON_APP_RUNNER (not used at the moment)
+# running_on_app_runner_var = get_or_create_env_var('RUNNING_ON_APP_RUNNER', '0')
+# print(f'The value of RUNNING_ON_APP_RUNNER is {running_on_app_runner_var}')
 
 
 
@@ -57,21 +56,21 @@ def ensure_output_folder_exists(output_folder):
     else:
         print(f"The output folder already exists:", folder_name)
 
-def get_connection_params(request: gr.Request):
+async def get_connection_params(request: gr.Request):
         if request:
-            #request_data = request.json()  # Parse JSON body
-            #print("All request data:", request_data)
+            # request_data = await request.json()  # Parse JSON body
+            # print("All request data:", request_data)
             #context_value = request_data.get('context') 
             #if 'context' in request_data:
             #     print("Request context dictionary:", request_data['context'])
 
-            #print("Request headers dictionary:", request.headers)
-            #print("All host elements", request.client)           
-            #print("IP address:", request.client.host)
+            # print("Request headers dictionary:", request.headers)
+            # print("All host elements", request.client)           
+            # print("IP address:", request.client.host)
             #print("Query parameters:", dict(request.query_params))
             # To get the underlying FastAPI items you would need to use await and some fancy @ stuff for a live query: https://fastapi.tiangolo.com/vi/reference/request/
             #print("Request dictionary to object:", request.request.body())
-            #print("Session hash:", request.session_hash)
+            print("Session hash:", request.session_hash)
 
             # Retrieving or setting CUSTOM_CLOUDFRONT_HEADER
             CUSTOM_CLOUDFRONT_HEADER_var = get_or_create_env_var('CUSTOM_CLOUDFRONT_HEADER', '')
@@ -97,7 +96,7 @@ def get_connection_params(request: gr.Request):
             else:
                 out_session_hash = request.session_hash
                 base_folder = "temp-files/"
-                #print("Cognito ID not found. Using session hash as save folder.")
+                # print("Cognito ID not found. Using session hash as save folder.")
 
             output_folder = base_folder + out_session_hash + "/"
             #if bucket_name:
@@ -109,9 +108,9 @@ def get_connection_params(request: gr.Request):
             return "", ""
 
 # Attempt to delete content of gradio temp folder
-def get_temp_folder_path():
-    username = getpass.getuser()
-    return os.path.join('C:\\Users', username, 'AppData\\Local\\Temp\\gradio')
+# def get_temp_folder_path():
+#     username = getpass.getuser()
+#     return os.path.join('C:\\Users', username, 'AppData\\Local\\Temp\\gradio')
 
 def empty_folder(directory_path):
     if not os.path.exists(directory_path):
