@@ -5,7 +5,10 @@ FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm
 # COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.3 /lambda-adapter /opt/extensions/lambda-adapter
 
 # Install wget
-RUN apt-get update && apt-get install -y wget
+RUN apt-get update && \
+	apt-get install -y wget \ 
+	apt-get install -y curl \
+	apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create a directory for the model
 RUN mkdir /model
@@ -29,6 +32,8 @@ RUN useradd -m -u 1000 user
 
 # Change ownership of /home/user directory
 RUN chown -R user:user /home/user
+
+EXPOSE 7860
 
 # Make output folder
 RUN mkdir -p /home/user/app/output && chown -R user:user /home/user/app/output
