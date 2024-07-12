@@ -6,8 +6,8 @@ FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm
 
 # Install wget
 RUN apt-get update && \
-	apt-get install -y wget \ 
-	apt-get install -y curl \
+	apt-get install -y wget && \ 
+	apt-get install -y curl && \
 	apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create a directory for the model
