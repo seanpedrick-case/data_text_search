@@ -1,43 +1,48 @@
 # First stage: build dependencies
-FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm
+FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm AS builder
 
 # Optional - install Lambda web adapter in case you want to run with with an AWS Lamba function URL
 # COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.3 /lambda-adapter /opt/extensions/lambda-adapter
 
-# Install wget
-RUN apt-get update && \
-	apt-get install -y wget && \ 
-	apt-get install -y curl && \
-	apt-get clean && rm -rf /var/lib/apt/lists/*
+# Update apt
+RUN apt-get update && rm -rf /var/lib/apt/lists/*
 
 # Create a directory for the model
-RUN mkdir /model
+RUN mkdir -p /model /model/minilm /install
 
 WORKDIR /src
 
-COPY requirements.txt .
+COPY requirements_aws.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install torch==2.4.0+cpu --target=/install --index-url https://download.pytorch.org/whl/cpu \
+&& pip install --no-cache-dir --target=/install sentence-transformers==3.0.1 --no-deps \
+&& pip install --no-cache-dir --target=/install -r requirements_aws.txt \
+&& pip install --no-cache-dir --target=/install gradio==4.41.0
 
-# Gradio needs to be installed after due to conflict with spacy in requirements
-RUN pip install --no-cache-dir gradio==4.37.2
+# Add /install to the PYTHONPATH
+ENV PYTHONPATH="/install:${PYTHONPATH}"
 
-# Download the BGE embedding model during the build process. Create a directory for the model and download specific files using huggingface_hub
-RUN mkdir -p /model/minilm
+# Download the embedding model during the build process. Create a directory for the model and download specific files using huggingface_hub
 COPY download_model.py /src/download_model.py
 RUN python /src/download_model.py
+
+# Stage 2: Final runtime image
+FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm
 
 # Set up a new user named "user" with user ID 1000
 RUN useradd -m -u 1000 user
 
+# Copy installed packages from builder stage
+COPY --from=builder /install /usr/local/lib/python3.11/site-packages/
+
 # Change ownership of /home/user directory
 RUN chown -R user:user /home/user
 
-EXPOSE 7860
-
 # Make output folder
-RUN mkdir -p /home/user/app/output && chown -R user:user /home/user/app/output
-RUN mkdir -p /home/user/.cache/huggingface/hub && chown -R user:user /home/user/.cache/huggingface/hub
+RUN mkdir -p /home/user/app/output && mkdir -p /home/user/.cache/huggingface/hub && chown -R user:user /home/user
+
+# Copy models from the builder stage
+COPY --from=builder /model/minilm /home/user/app/model/minilm
 
 # Switch to the "user" user
 USER user
@@ -54,7 +59,6 @@ ENV HOME=/home/user \
 	GRADIO_SERVER_PORT=7860 \
 	GRADIO_THEME=huggingface \
 	AWS_STS_REGIONAL_ENDPOINT=regional \
-	#GRADIO_ROOT_PATH=/data-text-search \
 	SYSTEM=spaces
  
 # Set the working directory to the user's home directory
