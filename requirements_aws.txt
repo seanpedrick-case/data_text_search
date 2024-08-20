@@ -7,4 +7,7 @@ en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_
 lxml==5.2.2
 boto3==1.34.158
 transformers==4.44.0
+scikit-learn==1.5.1
+scipy==1.11.4
+tqdm==4.66.5
 numpy==1.26.4
