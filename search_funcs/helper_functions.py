@@ -261,13 +261,13 @@ def initial_data_load(in_file:List[str], progress = gr.Progress(track_tqdm=True)
 
     progress(0.3, desc="Loading in data files")
 
-    data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "search_index" not in string.lower()]
+    data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() or "prep_docs" in string.lower()]
     print("Data file names:", data_file_names)
 
     if not data_file_names:
         out_message = "Please load in at least one csv/Excel/parquet data file."
         print(out_message)
-        return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), pd.DataFrame(), index_load, embed_load, tokenised_load, out_message, None
+        return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), pd.DataFrame(), index_load, embed_load, tokenised_load, out_message, None, file_list
 
     # This if you have loaded in a documents object for the semantic search
     if "pkl" in data_file_names[0]: 
@@ -288,11 +288,9 @@ def initial_data_load(in_file:List[str], progress = gr.Progress(track_tqdm=True)
             if file_size > file_size_bytes_500mb:
                 out_message = "Data file greater than 500mb in size. Please use smaller sizes."
                 print(out_message)
-                return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), pd.DataFrame(), index_load, embed_load, tokenised_load, out_message, None
-
+                return gr.Dropdown(choices=concat_choices), gr.Dropdown(choices=concat_choices), pd.DataFrame(), pd.DataFrame(), index_load, embed_load, tokenised_load, out_message, None, file_list
 
             df_new = read_file(file)
-
             df = pd.concat([df, df_new], ignore_index = True)
 
         new_choices = list(df.columns)
@@ -302,22 +300,22 @@ def initial_data_load(in_file:List[str], progress = gr.Progress(track_tqdm=True)
     progress(0.6, desc="Loading in embedding/search index files")
 
     # Check if there is a search index file already
-    index_file_names = [string for string in file_list if ".gz" in string.lower()]
+    index_file_names = [string for string in file_list if "pkl.gz" in string.lower()]
 
     if index_file_names:
         index_file_name = index_file_names[0]
         print("Search index file name found:", index_file_name)
         index_load = read_file(index_file_name)
 
-    embeddings_file_names = [string for string in file_list if "embedding" in string.lower()]
+    embeddings_file_names = [string for string in file_list if ".npz" in string.lower()]
 
     if embeddings_file_names:
         print("Loading embeddings from file.")
         embed_load = np.load(embeddings_file_names[0])['arr_0']
 
         # If embedding files have 'super_compress' in the title, they have been multiplied by 100 before save
-        if "compress" in embeddings_file_names[0]:
-            embed_load /= 100
+        #if "compress" in embeddings_file_names[0]:
+        #    embed_load /= 100
     else:
         embed_load = np.array([])
 

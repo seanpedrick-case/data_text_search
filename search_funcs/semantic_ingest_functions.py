@@ -97,6 +97,11 @@ def csv_excel_text_to_docs(df:PandasDataFrame, in_file:List[str], text_column:st
     ensure_output_folder_exists(output_folder)
     output_list = []
 
+    if not isinstance(text_column, str):
+        text_column = str(text_column)
+
+    print("text_column:", text_column)
+
     if not in_file:
         return None, "Please load in at least one file.", output_list
 
@@ -115,12 +120,12 @@ def csv_excel_text_to_docs(df:PandasDataFrame, in_file:List[str], text_column:st
     data_file_name = data_file_names[0]
 
     # Check if file is a document format, and explode out as needed
-    if "prepared_docs" in data_file_name:
+    if "prep_docs" in data_file_name:
         print("Loading in documents from file.")
 
         doc_sections = df
 
-        # Convert each element in the Series to a Document instance
+        print("doc_sections:", doc_sections[0])
 
         return doc_sections, "Finished preparing documents", output_list
 
@@ -147,17 +152,29 @@ def csv_excel_text_to_docs(df:PandasDataFrame, in_file:List[str], text_column:st
         clean_toc = time.perf_counter()
         clean_time_out = f"Cleaning the text took {clean_toc - clean_tic:0.1f} seconds."
         print(clean_time_out)
+    
+    else:
+        df_list = list(df[text_column])
+        prepared_text_df = pd.DataFrame(data={text_column:df_list})
+
+        # Drop original column from input file to reduce file size
+        in_df = df.drop(text_column, axis = 1)
+        df = pd.concat([in_df, prepared_text_df], axis = 1)
 
     cols = [col for col in df.columns if col != original_text_column]
-
     df["metadata"] = combine_metadata_columns(df, cols)
 
     progress(0.3, desc = "Converting data to document format")
 
+    #print("text_column name:", text_column)
+    #print("text_column:", df[text_column])
+    #print("metadata", df["metadata"])
+
     # Create a list of Document objects
-    doc_sections = [Document(page_content=row[text_column], 
-                        metadata= parse_metadata(row["metadata"]))
+    doc_sections = [Document(page_content=row[text_column], metadata= parse_metadata(row["metadata"]))
                 for index, row in progress.tqdm(df.iterrows(), desc = "Splitting up text", unit = "rows")]
+    
+    print("doc_sections:", doc_sections[0])
 
     ingest_toc = time.perf_counter()
 
@@ -169,15 +186,11 @@ def csv_excel_text_to_docs(df:PandasDataFrame, in_file:List[str], text_column:st
         data_file_out_name_no_ext = get_file_path_end(data_file_name)
         file_name = data_file_out_name_no_ext
 
-        if clean == "No":
-            out_doc_file_name = output_folder + file_name + "_prepared_docs.pkl.gz"
-            with gzip.open(out_doc_file_name, 'wb') as file:
-                pickle.dump(doc_sections, file)
+        if clean == "No": out_doc_file_name = output_folder + file_name + "_prep_docs.pkl.gz"
+        elif clean == "Yes": out_doc_file_name = output_folder + file_name + "_cleaned_prep_docs.pkl.gz"
 
-        elif clean == "Yes":
-            out_doc_file_name = output_folder + file_name + "_cleaned_prepared_docs.pkl.gz"
-            with gzip.open(out_doc_file_name, 'wb') as file:
-                pickle.dump(doc_sections, file)
+        with gzip.open(out_doc_file_name, 'wb') as file:
+            pickle.dump(doc_sections, file)
 
         output_list.append(out_doc_file_name)
         print("Documents saved to file.")

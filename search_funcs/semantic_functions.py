@@ -50,7 +50,7 @@ def load_embedding_model(embeddings_name = "BAAI/bge-small-en-v1.5", embedding_l
 
     return embeddings_model, torch_device
 
-def docs_to_bge_embed_np_array(
+def docs_to_embed_np_array(
     docs_out: list, 
     in_file: list, 
     output_file_state: str, 
@@ -136,9 +136,9 @@ def docs_to_bge_embed_np_array(
 
             progress(0.9, desc = "Saving embeddings to file")
             if embeddings_compress == "No":
-                semantic_search_file_name = output_folder + data_file_name_no_ext + '_bge_embeddings.npz'
+                semantic_search_file_name = output_folder + data_file_name_no_ext + '_embeddings.npz'
             else:
-                semantic_search_file_name = output_folder + data_file_name_no_ext + '_bge_embedding_compress.npz'
+                semantic_search_file_name = output_folder + data_file_name_no_ext + '_embedding_compress.npz'
                 
             np.savez_compressed(semantic_search_file_name, embeddings_out)
 

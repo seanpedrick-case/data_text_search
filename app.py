@@ -7,7 +7,7 @@ PandasDataFrame = Type[pd.DataFrame]
 
 from search_funcs.bm25_functions import prepare_bm25_input_data, prepare_bm25, bm25_search
 from search_funcs.semantic_ingest_functions import csv_excel_text_to_docs
-from search_funcs.semantic_functions import load_embedding_model, docs_to_bge_embed_np_array, bge_semantic_search
+from search_funcs.semantic_functions import load_embedding_model, docs_to_embed_np_array, bge_semantic_search
 from search_funcs.helper_functions import display_info, initial_data_load, put_columns_in_join_df, get_connection_params, output_folder, get_or_create_env_var # Not currently used: get_temp_folder_path, empty_folder, 
 from search_funcs.spacy_search_funcs import spacy_fuzzy_search
 from search_funcs.aws_functions import load_data_from_aws
@@ -99,7 +99,7 @@ depends on factors such as the type of documents or queries. Information taken f
     """
     **Thematic/semantic search**
 
-    This search type enables you to search for general terms (e.g. happiness, nature) and the search will pick out text passages that are most semantically similar to them. 1. Load in data file (ideally a file with '_cleaned' at the end of the name, a pkl.gz file), with (optionally) the 'embeddings... .npz' file in the same folder to save loading time. 2. Select the field in your data to search. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the 'Enter semantic search query here' box below and press Enter/click on 'Start semantic search'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
+    This search type enables you to search for general terms (e.g. happiness, nature) and the search will pick out text passages that are most semantically similar to them. 1. Load in data file (ideally a file with '_cleaned' at the end of the name, a pkl.gz file), with (optionally) the 'embed... .npz' file in the same folder to save loading time. 2. Select the field in your data to search. 3. Wait for the data file to be prepared for search. 4. Enter the search term in the 'Enter semantic search query here' box below and press Enter/click on 'Start semantic search'. 4. Your search results will be saved in a csv file and will be presented in the 'File output' area below.
     """)       
 
         with gr.Row():
@@ -202,7 +202,7 @@ depends on factors such as the type of documents or queries. Information taken f
     
     load_semantic_data_button.click(
         csv_excel_text_to_docs, inputs=[semantic_data_state, in_semantic_file, in_semantic_column, in_clean_data, return_intermediate_files], outputs=[semantic_input_document_format, semantic_load_progress, output_file_state], api_name="convert_texts_to_documents").\
-        then(docs_to_bge_embed_np_array, inputs=[semantic_input_document_format, in_semantic_file, output_file_state, in_clean_data, embeddings_state, embeddings_model_name_state, embeddings_model_loc_state, return_intermediate_files, embeddings_compress], outputs=[semantic_load_progress, embeddings_state, semantic_output_file, output_file_state, embeddings_model_state], api_name="embed_documents")
+        then(docs_to_embed_np_array, inputs=[semantic_input_document_format, in_semantic_file, output_file_state, in_clean_data, embeddings_state, embeddings_model_name_state, embeddings_model_loc_state, return_intermediate_files, embeddings_compress], outputs=[semantic_load_progress, embeddings_state, semantic_output_file, output_file_state, embeddings_model_state], api_name="embed_documents")
 
     # Semantic search query
     semantic_submit.click(bge_semantic_search, inputs=[semantic_query, embeddings_state, semantic_input_document_format, semantic_k_val, semantic_min_distance, embeddings_model_state, embeddings_model_name_state, embeddings_compress, join_data_state, in_join_column, search_df_join_column], outputs=[semantic_output_single_text, semantic_output_file], api_name="semantic_search")
