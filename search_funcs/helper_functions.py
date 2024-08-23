@@ -261,7 +261,7 @@ def initial_data_load(in_file:List[str], progress = gr.Progress(track_tqdm=True)
 
     progress(0.3, desc="Loading in data files")
 
-    data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() or "prep_docs" in string.lower()]
+    data_file_names = [string for string in file_list if "tokenised" not in string.lower() and "npz" not in string.lower() and "pkl.gz" not in string.lower()or "prep_docs" in string.lower()]
     print("Data file names:", data_file_names)
 
     if not data_file_names:
