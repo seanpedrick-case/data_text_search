@@ -42,7 +42,7 @@ def combine_metadata_columns(df:PandasDataFrame, cols:List[str]) -> PandasSeries
     df['blank_column'] = ''
 
     for n, col in enumerate(cols):
-        df[col] = df[col].astype(str).str.replace('"',"'").str.replace('\n', ' ').str.replace('\r', ' ').str.replace('\r\n', ' ').str.cat(df['blank_column'].astype(str), sep="")
+        df[col] = df[col].astype(str).str.replace('"',"'").str.replace('\n', ' ').str.replace('\r', ' ').str.replace('\r\n', ' ').str.replace('\\', '/').str.cat(df['blank_column'].astype(str), sep="")
 
         df['metadata'] = df['metadata'] + '"' + cols[n] + '": "' + df[col] + '", '
 

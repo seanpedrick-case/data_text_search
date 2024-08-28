@@ -42,7 +42,7 @@ Toggle 'Clean text during load...' to "Yes" if you want to remove html tags and 
 
 'Return intermediate files', when set to "Yes", will save a tokenised text file (for keyword search), or an embedded text file (for semantic search) during data preparation. These files can then be loaded in next time alongside the data files to save preparation time for future search sessions.
 
-'Round embeddings to three dp...' will reduce the precision of the embedding outputs to 3 decimal places, and will multiply all values by 100, reducing the size of the output numpy array by about 50%. It seems to have minimal effect on the output search result according to simple search comparisons, but I cannot guarantee this! 
+'Round embeddings...' will reduce the precision of the embedding outputs to 3 decimal places, and will multiply all values by 100, reducing the size of the output numpy array by about 50%. It seems to have minimal effect on the output search result according to simple search comparisons, but I cannot guarantee this! 
 
 ## Keyword search options
 Here are a few options to modify the BM25 search parameters. If you want more information on what each parameter does, click the relevant info button to the right of the sliders.
