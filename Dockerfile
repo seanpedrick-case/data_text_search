@@ -14,12 +14,12 @@ WORKDIR /src
 
 COPY requirements_aws.txt .
 
-RUN pip install torch==2.5.1+cpu --target=/install --index-url https://download.pytorch.org/whl/cpu \
-&& pip install --no-cache-dir --target=/install sentence-transformers==3.3.1 --no-deps \
-&& pip install --no-cache-dir --target=/install -r requirements_aws.txt \
-&& pip install --no-cache-dir --target=/install gradio==5.6.0 \
-&& pip uninstall -y typing_extensions \
-&& pip install --no-cache-dir --target=/install typing-extensions==4.12.2
+RUN pip uninstall -y typing_extensions \
+&& pip install typing_extensions==4.12.2 --no-cache-dir --target=/install  \
+&& pip install torch==2.5.1+cpu --target=/install --index-url https://download.pytorch.org/whl/cpu --no_cache_dir \
+&& pip install sentence-transformers==3.3.1 --no-cache-dir --target=/install --no-deps \
+&& pip install -r requirements_aws.txt --no-cache-dir --target=/install \
+&& pip install gradio==5.6.0 --no-cache-dir --target=/install 
 
 # Add /install to the PYTHONPATH
 ENV PYTHONPATH="/install:${PYTHONPATH}"

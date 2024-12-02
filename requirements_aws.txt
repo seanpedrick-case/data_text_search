@@ -11,3 +11,4 @@ scikit-learn==1.5.1
 tqdm==4.66.5
 numpy==1.26.4
 python-levenshtein==0.26.1
+typing_extensions==4.12.2
