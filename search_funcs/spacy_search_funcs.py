@@ -131,7 +131,7 @@ def spacy_fuzzy_search(string_query:str, tokenised_data: List[List[str]], origin
     # Out file
     query_str_file = "_".join(tokenised_query).replace(" ", "_")  # Replace spaces with underscores
     query_str_file = re.sub(r'[<>:"/\\|?*]', '', query_str_file)  # Remove invalid characters
-    query_str_file = query_str_file[:30]  # Limit to 30 characters
+    query_str_file = query_str_file[:100]  # Limit to 100 characters
         
     results_df_name = output_folder + "fuzzy_keyword_search_result_" + today_rev + "_" +  query_str_file + ".xlsx"
 
@@ -140,8 +140,8 @@ def spacy_fuzzy_search(string_query:str, tokenised_data: List[List[str]], origin
 
     #results_df_out.to_excel(results_df_name, index= None)
 
-    print("string_query:", string_query)
-    print(results_df_out)
+    #print("string_query:", string_query)
+    #print(results_df_out)
 
     # Highlight found text and save to file
     results_df_out_wb = create_highlighted_excel_wb(results_df_out, string_query, "search_text")
