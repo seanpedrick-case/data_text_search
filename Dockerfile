@@ -19,7 +19,7 @@ RUN pip install torch==2.5.1+cpu --target=/install --index-url https://download.
 && pip install --no-cache-dir --target=/install -r requirements_aws.txt \
 && pip install --no-cache-dir --target=/install gradio==5.6.0 \
 && pip uninstall -y typing_extensions \
-&& pip install --no-cache-dir --target=/install typing_extensions==4.11.0
+&& pip install --no-cache-dir --target=/install typing-extensions==4.12.2
 
 # Add /install to the PYTHONPATH
 ENV PYTHONPATH="/install:${PYTHONPATH}"
