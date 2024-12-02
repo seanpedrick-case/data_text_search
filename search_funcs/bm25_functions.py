@@ -345,7 +345,7 @@ def prepare_bm25_input_data(
 	
 	progress(0.4, desc = "Tokenising text")
 
-	print("Tokenised state:", tokenised_state)
+	#print("Tokenised state:", tokenised_state)
 
 	if tokenised_state:
 		prepared_search_text_list = tokenised_state.iloc[:,0].tolist()

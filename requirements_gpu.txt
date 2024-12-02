@@ -1,11 +1,12 @@
-pandas==2.2.2
+pandas==2.2.3
 polars==0.20.3
-pyarrow==14.0.2
+pyarrow==17.0.0
 openpyxl==3.1.3
-torch==2.4.0 --index-url https://download.pytorch.org/whl/nightly/cu121
-spacy
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz
-gradio
-sentence_transformers==3.0.1
+torch==2.5.1 --index-url https://download.pytorch.org/whl/nightly/cu121
+spacy==3.8.0
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0.tar.gz
+gradio==5.6.0
+sentence_transformers==3.3.1
 lxml==5.2.2
-boto3==1.34.103
+boto3==1.35.71
+python-levenshtein==0.26.1

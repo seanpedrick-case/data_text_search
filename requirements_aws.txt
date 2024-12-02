@@ -1,13 +1,13 @@
-pandas==2.2.2
+pandas==2.2.3
 polars==0.20.3
-pyarrow==14.0.2
+pyarrow==17.0.0
 openpyxl==3.1.3
-spacy==3.7.5
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz
+spacy==3.8.0
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0.tar.gz
 lxml==5.2.2
-boto3==1.34.158
-transformers==4.44.0
+boto3==1.35.71
+transformers==4.46.3
 scikit-learn==1.5.1
-scipy==1.11.4
 tqdm==4.66.5
 numpy==1.26.4
+python-levenshtein==0.26.1

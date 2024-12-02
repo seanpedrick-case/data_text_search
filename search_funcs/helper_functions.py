@@ -4,7 +4,6 @@ import pandas as pd
 import gradio as gr
 import os
 import shutil
-import getpass
 import gzip
 import zipfile
 import pickle
@@ -34,6 +33,14 @@ def get_or_create_env_var(var_name, default_value):
     
     return value
 
+# Retrieving or setting CUSTOM_HEADER
+CUSTOM_HEADER = get_or_create_env_var('CUSTOM_HEADER', '')
+print(f'CUSTOM_HEADER found')
+
+# Retrieving or setting CUSTOM_HEADER_VALUE
+CUSTOM_HEADER_VALUE = get_or_create_env_var('CUSTOM_HEADER_VALUE', '')
+print(f'CUSTOM_HEADER_VALUE found')
+
 # Retrieving or setting output folder
 output_folder = get_or_create_env_var('GRADIO_OUTPUT_FOLDER', 'output/')
 print(f'The value of GRADIO_OUTPUT_FOLDER is {output_folder}')
@@ -41,8 +48,6 @@ print(f'The value of GRADIO_OUTPUT_FOLDER is {output_folder}')
 # Retrieving or setting RUNNING_ON_APP_RUNNER (not used at the moment)
 # running_on_app_runner_var = get_or_create_env_var('RUNNING_ON_APP_RUNNER', '0')
 # print(f'The value of RUNNING_ON_APP_RUNNER is {running_on_app_runner_var}')
-
-
 
 def ensure_output_folder_exists(output_folder):
     """Checks if the output folder exists, creates it if not."""
@@ -56,72 +61,100 @@ def ensure_output_folder_exists(output_folder):
     else:
         print(f"The output folder already exists:", folder_name)
 
+def get_input_file_names(file_input):
+    '''
+    Get list of input files to report to logs.
+    '''
+
+    all_relevant_files = []
+    file_name_with_extension = ""
+    full_file_name = ""
+
+    #print("file_input in input file names:", file_input)
+    if isinstance(file_input, dict):
+        file_input = os.path.abspath(file_input["name"])
+
+    if isinstance(file_input, str):
+        file_input_list = [file_input]
+    else:
+        file_input_list = file_input
+
+    for file in file_input_list:
+        if isinstance(file, str):
+            file_path = file
+        else:
+            file_path = file.name
+
+        file_path_without_ext = get_file_path_end(file_path)
+
+        file_extension = os.path.splitext(file_path)[1].lower()
+
+        # Check if the file is an image type
+        if file_extension in ['.xlsx', '.csv', '.parquet']:
+            all_relevant_files.append(file_path_without_ext)
+            file_name_with_extension = file_path_without_ext + file_extension
+            full_file_name = file_path
+    
+    all_relevant_files_str = ", ".join(all_relevant_files)
+
+    print("all_relevant_files_str:", all_relevant_files_str)
+
+    return all_relevant_files_str, file_name_with_extension, full_file_name
+
 async def get_connection_params(request: gr.Request):
     base_folder = ""
 
-    if request:
-        #print("request user:", request.username)
+    #print("request user:", request.username)
 
-        #request_data = await request.json()  # Parse JSON body
-        #print("All request data:", request_data)
-        #context_value = request_data.get('context') 
-        #if 'context' in request_data:
-        #     print("Request context dictionary:", request_data['context'])
+    #request_data = await request.json()  # Parse JSON body
+    #print("All request data:", request_data)
+    #context_value = request_data.get('context') 
+    #if 'context' in request_data:
+    #     print("Request context dictionary:", request_data['context'])
 
-        # print("Request headers dictionary:", request.headers)
-        # print("All host elements", request.client)           
-        # print("IP address:", request.client.host)
-        # print("Query parameters:", dict(request.query_params))
-        # To get the underlying FastAPI items you would need to use await and some fancy @ stuff for a live query: https://fastapi.tiangolo.com/vi/reference/request/
-        #print("Request dictionary to object:", request.request.body())
-        print("Session hash:", request.session_hash)
+    print("Request headers dictionary:", request.headers)
+    print("All host elements", request.client)           
+    print("IP address:", request.client.host)
+    print("Query parameters:", dict(request.query_params))
+    # To get the underlying FastAPI items you would need to use await and some fancy @ stuff for a live query: https://fastapi.tiangolo.com/vi/reference/request/
+    #print("Request dictionary to object:", request.request.body())
+    print("Session hash:", request.session_hash)
 
-        # Retrieving or setting CUSTOM_CLOUDFRONT_HEADER
-        CUSTOM_CLOUDFRONT_HEADER_var = get_or_create_env_var('CUSTOM_CLOUDFRONT_HEADER', '')
-        print(f'The value of CUSTOM_CLOUDFRONT_HEADER is {CUSTOM_CLOUDFRONT_HEADER_var}')
-
-        # Retrieving or setting CUSTOM_CLOUDFRONT_HEADER_VALUE
-        CUSTOM_CLOUDFRONT_HEADER_VALUE_var = get_or_create_env_var('CUSTOM_CLOUDFRONT_HEADER_VALUE', '')
-        print(f'The value of CUSTOM_CLOUDFRONT_HEADER_VALUE_var is {CUSTOM_CLOUDFRONT_HEADER_VALUE_var}')
-
-        if CUSTOM_CLOUDFRONT_HEADER_var and CUSTOM_CLOUDFRONT_HEADER_VALUE_var:
-            if CUSTOM_CLOUDFRONT_HEADER_var in request.headers:
-                supplied_cloudfront_custom_value = request.headers[CUSTOM_CLOUDFRONT_HEADER_var]
-                if supplied_cloudfront_custom_value == CUSTOM_CLOUDFRONT_HEADER_VALUE_var:
-                    print("Custom Cloudfront header found:", supplied_cloudfront_custom_value)
+    if CUSTOM_HEADER and CUSTOM_HEADER_VALUE:
+            if CUSTOM_HEADER in request.headers:
+                supplied_custom_header_value = request.headers[CUSTOM_HEADER]
+                if supplied_custom_header_value == CUSTOM_HEADER_VALUE:
+                    print("Custom header supplied and matches CUSTOM_HEADER_VALUE")
                 else:
-                    raise(ValueError, "Custom Cloudfront header value does not match expected value.")
+                    print("Custom header value does not match expected value.")
+                    raise ValueError("Custom header value does not match expected value.")
+            else:
+                print("Custom header value not found.")
+                raise ValueError("Custom header value not found.")   
 
-        # Get output save folder from 1 - username passed in from direct Cognito login, 2 - Cognito ID header passed through a Lambda authenticator, 3 - the session hash.
+    # Get output save folder from 1 - username passed in from direct Cognito login, 2 - Cognito ID header passed through a Lambda authenticator, 3 - the session hash.
 
-        if request.username:
-            out_session_hash = request.username
-            base_folder = "user-files/"
+    if request.username:
+        out_session_hash = request.username
+        base_folder = "user-files/"
+        print("Request username found:", out_session_hash)
 
-        elif 'x-cognito-id' in request.headers:
-            out_session_hash = request.headers['x-cognito-id']
-            base_folder = "user-files/"
-            print("Cognito ID found:", out_session_hash)
+    elif 'x-cognito-id' in request.headers:
+        out_session_hash = request.headers['x-cognito-id']
+        base_folder = "user-files/"
+        print("Cognito ID found:", out_session_hash)
 
-        else:
-            out_session_hash = request.session_hash
-            base_folder = "temp-files/"
-            # print("Cognito ID not found. Using session hash as save folder:", out_session_hash)
-
-        output_folder = base_folder + out_session_hash + "/"
-        #if bucket_name:
-        #    print("S3 output folder is: " + "s3://" + bucket_name + "/" + output_folder)
-
-        return out_session_hash, output_folder
     else:
-        print("No session parameters found.")
-        return "",""
-    
-# Attempt to delete content of gradio temp folder
-# def get_temp_folder_path():
-#     username = getpass.getuser()
-#     return os.path.join('C:\\Users', username, 'AppData\\Local\\Temp\\gradio')
+        out_session_hash = request.session_hash
+        base_folder = "temp-files/"
+        # print("Cognito ID not found. Using session hash as save folder:", out_session_hash)
 
+    output_folder = base_folder + out_session_hash + "/"
+    #if bucket_name:
+    #    print("S3 output folder is: " + "s3://" + bucket_name + "/" + output_folder)
+
+    return out_session_hash, output_folder, out_session_hash
+    
 def empty_folder(directory_path):
     if not os.path.exists(directory_path):
         #print(f"The directory {directory_path} does not exist. No temporary files from previous app use found to delete.")
@@ -495,14 +528,18 @@ def create_highlighted_excel_wb(df: pd.DataFrame, search_text: str, column_to_hi
 
     column_width = 150  # Adjust as needed
     relevant_column_no = (df.columns == column_to_highlight).argmax() + 1
-    print(relevant_column_no)
+    print("Relevant column number is:", relevant_column_no)
     sheet.column_dimensions[sheet.cell(row=1, column=relevant_column_no).column_letter].width = column_width
+
+    print("search_text is:", search_text)
 
     # Find substrings in cells and highlight
     for r_idx, row in enumerate(df.itertuples(), start=2):
         for c_idx, cell_value in enumerate(row[1:], start=1):
             sheet.cell(row=r_idx, column=c_idx, value=cell_value)
             if df.columns[c_idx - 1] == column_to_highlight:
+
+                print("cell value:", cell_value)
 
                 html_text, combined_positions = highlight_found_text(search_text, cell_value)
                 sheet.cell(row=r_idx, column=c_idx).value = create_rich_text_cell_from_positions(cell_value, combined_positions)

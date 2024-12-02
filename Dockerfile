@@ -2,7 +2,7 @@
 FROM public.ecr.aws/docker/library/python:3.11.9-slim-bookworm AS builder
 
 # Optional - install Lambda web adapter in case you want to run with with an AWS Lamba function URL
-# COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.3 /lambda-adapter /opt/extensions/lambda-adapter
+# COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.4 /lambda-adapter /opt/extensions/lambda-adapter
 
 # Update apt
 RUN apt-get update && rm -rf /var/lib/apt/lists/*
@@ -14,10 +14,10 @@ WORKDIR /src
 
 COPY requirements_aws.txt .
 
-RUN pip install torch==2.4.0+cpu --target=/install --index-url https://download.pytorch.org/whl/cpu \
-&& pip install --no-cache-dir --target=/install sentence-transformers==3.0.1 --no-deps \
+RUN pip install torch==2.5.1+cpu --target=/install --index-url https://download.pytorch.org/whl/cpu \
+&& pip install --no-cache-dir --target=/install sentence-transformers==3.3.1 --no-deps \
 && pip install --no-cache-dir --target=/install -r requirements_aws.txt \
-&& pip install --no-cache-dir --target=/install gradio==4.41.0
+&& pip install --no-cache-dir --target=/install gradio==5.6.0
 
 # Add /install to the PYTHONPATH
 ENV PYTHONPATH="/install:${PYTHONPATH}"
@@ -57,6 +57,7 @@ ENV HOME=/home/user \
 	GRADIO_NUM_PORTS=1 \
 	GRADIO_SERVER_NAME=0.0.0.0 \
 	GRADIO_SERVER_PORT=7860 \
+	GRADIO_ANALYTICS_ENABLED=False \
 	GRADIO_THEME=huggingface \
 	AWS_STS_REGIONAL_ENDPOINT=regional \
 	SYSTEM=spaces

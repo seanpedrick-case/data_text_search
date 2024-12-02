@@ -8,7 +8,7 @@ from search_funcs.helper_functions import get_file_path_end, create_highlighted_
 PandasDataFrame = Type[pd.DataFrame]
 today_rev = datetime.now().strftime("%Y%m%d")
 
-def load_embedding_model(embeddings_name = "BAAI/bge-small-en-v1.5", embedding_loc="bge/"):
+def load_embedding_model(embeddings_name = "sentence-transformers/all-MiniLM-L6-v2", embedding_loc="minilm/"):
 
     from torch import cuda, backends
     from sentence_transformers import SentenceTransformer
@@ -63,7 +63,7 @@ def docs_to_embed_np_array(
     progress: gr.Progress = gr.Progress(track_tqdm=True)
 ) -> tuple:
     """
-    Process documents to create BGE embeddings and save them as a numpy array.
+    Process documents to create embeddings and save them as a numpy array.
 
     Parameters:
     - docs_out (list): List of documents to be embedded.
@@ -119,7 +119,8 @@ def docs_to_embed_np_array(
             print("Embedding with MiniLM-L6-v2 model")
 
         if embeddings_compress == "No":
-            print("Embedding with full fp32 precision")
+            print("Embedding with fp16 precision")
+            embeddings_model.half()
             embeddings_out = embeddings_model.encode(sentences=page_contents, show_progress_bar = True, batch_size = batch_size)
         else:
             print("Embedding with int8 precision")
@@ -235,7 +236,7 @@ def process_data_from_scores_df(
 
     return results_df_out
 
-def bge_semantic_search(
+def semantic_search(
     query_str: str, 
     embeddings: np.ndarray, 
     documents: list, 
