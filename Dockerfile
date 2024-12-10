@@ -14,12 +14,13 @@ WORKDIR /src
 
 COPY requirements_aws.txt .
 
-RUN pip uninstall -y typing_extensions \
+RUN  pip uninstall -y typing_extensions \
 && pip install --no-cache-dir --target=/install typing_extensions==4.12.2 \
 && pip install torch==2.5.1+cpu --target=/install --index-url https://download.pytorch.org/whl/cpu \
 && pip install --no-cache-dir --target=/install sentence-transformers==3.3.1 --no-deps \
 && pip install --no-cache-dir --target=/install -r requirements_aws.txt \
-&& pip install --no-cache-dir --target=/install gradio==5.6.0
+&& pip install --no-cache-dir --target=/install gradio==5.8.0
+
 
 # Add /install to the PYTHONPATH
 ENV PYTHONPATH="/install:${PYTHONPATH}"
@@ -36,6 +37,9 @@ RUN useradd -m -u 1000 user
 
 # Copy installed packages from builder stage
 COPY --from=builder /install /usr/local/lib/python3.11/site-packages/
+
+# Check installed versions of typing_extensions
+RUN pip list | grep typing_extensions
 
 # Change ownership of /home/user directory
 RUN chown -R user:user /home/user

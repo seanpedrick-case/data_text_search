@@ -273,12 +273,24 @@ depends on factors such as the type of documents or queries. Information taken f
 COGNITO_AUTH = get_or_create_env_var('COGNITO_AUTH', '0')
 print(f'The value of COGNITO_AUTH is {COGNITO_AUTH}')
 
+MAX_QUEUE_SIZE = int(get_or_create_env_var('MAX_QUEUE_SIZE', '5'))
+print(f'The value of RUN_DIRECT_MODE is {MAX_QUEUE_SIZE}')
+
+MAX_FILE_SIZE = get_or_create_env_var('MAX_FILE_SIZE', '500mb')
+print(f'The value of MAX_FILE_SIZE is {MAX_FILE_SIZE}')
+
+GRADIO_SERVER_PORT = int(get_or_create_env_var('GRADIO_SERVER_PORT', '7860'))
+print(f'The value of GRADIO_SERVER_PORT is {GRADIO_SERVER_PORT}')
+
+ROOT_PATH = get_or_create_env_var('ROOT_PATH', '')
+print(f'The value of ROOT_PATH is {ROOT_PATH}')
+
 if __name__ == "__main__":
 
     if os.environ['COGNITO_AUTH'] == "1":
-        app.queue().launch(show_error=True, auth=authenticate_user)
+        app.queue(max_size=MAX_QUEUE_SIZE).launch(show_error=True, auth=authenticate_user, max_file_size=MAX_FILE_SIZE, server_port=GRADIO_SERVER_PORT, root_path=ROOT_PATH)
     else:
-        app.queue().launch(show_error=True, inbrowser=True)
+        app.queue(max_size=MAX_QUEUE_SIZE).launch(show_error=True, inbrowser=True, max_file_size=MAX_FILE_SIZE, server_port=GRADIO_SERVER_PORT, root_path=ROOT_PATH)
     
 # Running on local server with https: https://discuss.huggingface.co/t/how-to-run-gradio-with-0-0-0-0-and-https/38003 or https://dev.to/rajshirolkar/fastapi-over-https-for-development-on-windows-2p7d # Need to download OpenSSL and create own keys 
 # app.queue().launch(ssl_verify=False, share=False, debug=False, server_name="0.0.0.0",server_port=443,
